@@ -120,3 +120,5 @@ const AdminPanel: React.FC = () => {
 };
 
 export default AdminPanel;
+
+//Este componente AdminPanel permite a los administradores ver una lista de usuarios registrados y crear nuevos usuarios con roles específicos. Utiliza el contexto de autenticación para manejar tokens y cerrar sesión.
