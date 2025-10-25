@@ -1,3 +1,4 @@
+// src/components/SuperAdminPanel.tsx
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../AuthContext';
 
@@ -8,27 +9,23 @@ interface User {
   created_by_username?: string;
 }
 
+const ROLES = ['superadmin', 'admin', 'recepcionista', 'medico', 'enfermero'] as const;
+
 const SuperAdminPanel: React.FC = () => {
   const { token, logout } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('recepcionista');
+  const [role, setRole] = useState<typeof ROLES[number]>('recepcionista');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const fetchUsers = async () => {
     try {
       const response = await fetch('http://localhost:4000/api/users', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!response.ok) {
-        throw new Error('Error al obtener usuarios');
-      }
-
+      if (!response.ok) throw new Error('Error al obtener usuarios');
       const data = await response.json();
       setUsers(data);
     } catch (err) {
@@ -38,9 +35,7 @@ const SuperAdminPanel: React.FC = () => {
   };
 
   useEffect(() => {
-    if (token) {
-      fetchUsers();
-    }
+    if (token) fetchUsers();
   }, [token]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
@@ -60,9 +55,7 @@ const SuperAdminPanel: React.FC = () => {
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al crear usuario');
-      }
+      if (!response.ok) throw new Error(data.error || 'Error al crear usuario');
 
       setMessage('Usuario creado correctamente');
       setUsername('');
@@ -119,11 +112,14 @@ const SuperAdminPanel: React.FC = () => {
           <label className="block font-medium">Rol</label>
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value)}
+            onChange={(e) => setRole(e.target.value as typeof ROLES[number])}
             className="w-full border px-3 py-2 rounded"
           >
-            <option value="admin">Admin</option>
-            <option value="recepcionista">Recepcionista</option>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r.charAt(0).toUpperCase() + r.slice(1)}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -166,7 +162,5 @@ const SuperAdminPanel: React.FC = () => {
     </div>
   );
 };
-
-//La vaca lola tiene cabeza y tiene cola y hace muuuuuuuuuuuuuuuu
 
 export default SuperAdminPanel;

@@ -60,7 +60,7 @@ const AdminPanel: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto bg-white rounded shadow">
-      <h2 className="text-xl font-bold mb-4">Panel de Admin</h2>
+      <h2 className="text-xl font-bold mb-4">Panel de Enfermero</h2>
 
       <button onClick={logout} className="mb-4 bg-red-500 text-white px-4 py-1 rounded">
         Cerrar sesión
