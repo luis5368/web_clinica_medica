@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../Api';
 import { useAuth } from '../AuthContext';
-import CalendarView from './CalendarView';
+//import CalendarView from './CalendarView';
 
 interface User { id: number; username: string; role: string; created_by: number | null; }
 interface Paciente { id: number; nombre: string; edad: number; genero: string; direccion?: string; telefono?: string; email?: string; }
-interface Inventario { id: number; nombre: string; cantidad: number; }
+/* interface Inventario { id: number; nombre: string; cantidad: number; }
 interface Empleado { id: number; nombre: string; puesto: string; }
 interface Habitacion { id: number; numero: string; tipo: string; }
-interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; }
+interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; } */
 interface Cita { id: number; paciente: string; fecha: string; hora: string; motivo: string; }
 
 const ROLES: Array<'admin' | 'recepcionista' | 'medico' | 'enfermero'> = ['admin','recepcionista','medico','enfermero'];
@@ -35,10 +35,10 @@ const AdminPanel: React.FC = () => {
   const [pTelefono, setPTelefono] = useState('');
   const [pEmail, setPEmail] = useState('');
 
-  const [inventario, setInventario] = useState<Inventario[]>([]);
+  /* const [inventario, setInventario] = useState<Inventario[]>([]);
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
-  const [historial, setHistorial] = useState<Historial[]>([]);
+  const [historial, setHistorial] = useState<Historial[]>([]); */
   const [citas, setCitas] = useState<Cita[]>([]);
 
   // ------------------ FETCH ------------------
@@ -47,10 +47,10 @@ const AdminPanel: React.FC = () => {
       fetchUsers(); 
       fetchPacientes(); 
       fetchCitas();
-      fetchInventario();
+      /* fetchInventario();
       fetchEmpleados();
       fetchHabitaciones();
-      fetchHistorial();
+      fetchHistorial(); */
     }
   }, [token]);
 
@@ -86,7 +86,7 @@ const AdminPanel: React.FC = () => {
     }catch(e){setError('Error citas');}
   };
 
-  const fetchInventario = async()=>{
+/*   const fetchInventario = async()=>{
     try{
       const r = await api.get('/api/inventario',{headers:{Authorization:`Bearer ${token}`}});
       setInventario(r.data);
@@ -112,7 +112,7 @@ const AdminPanel: React.FC = () => {
       const r = await api.get('/api/historial',{headers:{Authorization:`Bearer ${token}`}});
       setHistorial(r.data);
     }catch(e){setError('Error historial');}
-  };
+  }; */
 
   // ------------------ HELPERS ------------------
   const calcularEdad = (fecha: string) => {
@@ -282,7 +282,7 @@ const AdminPanel: React.FC = () => {
         {/* --- Calendario --- */}
         {view==='calendar' && (
           <div className="bg-white p-6 rounded shadow-md mb-6">
-            <CalendarView citas={citas}/>
+            {/* <CalendarView citas={citas}/> */}
           </div>
         )}
       </main>

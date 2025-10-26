@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../Api';
 import { useAuth } from '../AuthContext';
-import CalendarView from './CalendarView';
+//import CalendarView from './CalendarView';
 
 interface Paciente {
   id: number;
@@ -209,7 +209,7 @@ const MedicoPanel: React.FC = () => {
         {view === 'calendar' && (
           <div className="mt-8">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Vista de calendario</h3>
-            <CalendarView citas={citas} />
+            {/* <CalendarView citas={citas} /> */}
           </div>
         )}
       </main>

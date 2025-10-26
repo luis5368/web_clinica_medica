@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../Api';
 import { useAuth } from '../AuthContext';
 import { useNavigate } from 'react-router-dom';
-import CalendarView from './CalendarView';
+//import CalendarView from './CalendarView';
 
 interface Cita {
   id: number;
@@ -197,7 +197,7 @@ const ReceptionPanel: React.FC = () => {
         {view === 'calendar' && (
           <div className="mt-8">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Vista de calendario</h3>
-            <CalendarView citas={citas} />
+            {/* <CalendarView citas={citas} /> */}
           </div>
         )}
 
