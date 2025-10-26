@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../Api';
 import { useAuth } from '../AuthContext';
+import CalendarView from './CalendarView';
 
 interface Paciente {
   id: number;
@@ -19,17 +20,22 @@ interface Historial {
   notas: string;
 }
 
-type View = 'pacientes' | 'historial';
+interface Cita {
+  id: number;
+  paciente: string;
+  fecha: string;
+  hora: string;
+  motivo: string;
+}
+
+type View = 'pacientes' | 'historial' | 'calendar';
 
 const MedicoPanel: React.FC = () => {
   const { token, logout } = useAuth();
   const [view, setView] = useState<View>('pacientes');
 
-  // Pacientes
+  // Datos pacientes
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [nombre, setNombre] = useState('');
-  const [edad, setEdad] = useState('');
-  const [genero, setGenero] = useState('M');
 
   // Historial clínico
   const [historial, setHistorial] = useState<Historial[]>([]);
@@ -39,23 +45,13 @@ const MedicoPanel: React.FC = () => {
   const [tratamiento, setTratamiento] = useState('');
   const [notas, setNotas] = useState('');
 
+  // Citas
+  const [citas, setCitas] = useState<Cita[]>([]);
+
   const fetchPacientes = async () => {
     try {
       const res = await api.get('/api/pacientes', { headers: { Authorization: `Bearer ${token}` } });
       setPacientes(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const createPaciente = async () => {
-    if (!nombre || !edad) return;
-    try {
-      const res = await api.post('/api/pacientes', { nombre, edad, genero }, { headers: { Authorization: `Bearer ${token}` } });
-      setPacientes(prev => [...prev, res.data]);
-      setNombre('');
-      setEdad('');
-      setGenero('M');
     } catch (err) {
       console.error(err);
     }
@@ -70,16 +66,25 @@ const MedicoPanel: React.FC = () => {
     }
   };
 
+  const fetchCitas = async () => {
+    try {
+      const res = await api.get('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
+      setCitas(res.data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const createHistorial = async () => {
     if (!pacienteId || !fecha || !diagnostico) return;
     try {
-      const res = await api.post('/api/historial', { pacienteId, fecha, diagnostico, tratamiento, notas }, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await api.post(
+        '/api/historial',
+        { pacienteId, fecha, diagnostico, tratamiento, notas },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setHistorial(prev => [...prev, res.data]);
-      setPacienteId(null);
-      setFecha('');
-      setDiagnostico('');
-      setTratamiento('');
-      setNotas('');
+      setPacienteId(null); setFecha(''); setDiagnostico(''); setTratamiento(''); setNotas('');
     } catch (err) {
       console.error(err);
     }
@@ -89,8 +94,12 @@ const MedicoPanel: React.FC = () => {
     if (token) {
       fetchPacientes();
       fetchHistorial();
+      fetchCitas();
     }
   }, [token]);
+
+  const totalCitas = citas.length;
+  const proximas = citas.filter(c => new Date(c.fecha) > new Date()).length;
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -101,6 +110,7 @@ const MedicoPanel: React.FC = () => {
           <nav className="space-y-4">
             <button className="text-left w-full" onClick={() => setView('pacientes')}>Pacientes</button>
             <button className="text-left w-full" onClick={() => setView('historial')}>Historial Clínico</button>
+            <button className="text-left w-full" onClick={() => setView('calendar')}>Calendario</button>
           </nav>
         </div>
         <button
@@ -115,19 +125,21 @@ const MedicoPanel: React.FC = () => {
       <main className="flex-1 p-8 overflow-y-auto">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Panel de Médico</h2>
 
+        {/* Tarjetas resumen citas */}
+        <div className="grid grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-6 rounded shadow-md">
+            <p className="text-gray-500">Total de citas</p>
+            <p className="text-3xl font-bold text-blue-600">{totalCitas}</p>
+          </div>
+          <div className="bg-white p-6 rounded shadow-md">
+            <p className="text-gray-500">Próximas citas</p>
+            <p className="text-3xl font-bold text-green-600">{proximas}</p>
+          </div>
+        </div>
+
         {view === 'pacientes' && (
           <div className="bg-white p-6 rounded shadow-md">
             <h3 className="text-lg font-semibold mb-4">Pacientes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <input value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Nombre" className="p-2 border rounded" />
-              <input value={edad} onChange={e => setEdad(e.target.value)} placeholder="Edad" className="p-2 border rounded" />
-              <select value={genero} onChange={e => setGenero(e.target.value)} className="p-2 border rounded">
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
-              </select>
-              <button onClick={createPaciente} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Crear</button>
-            </div>
-
             <table className="w-full border text-left">
               <thead>
                 <tr className="bg-gray-200">
@@ -191,6 +203,13 @@ const MedicoPanel: React.FC = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {view === 'calendar' && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Vista de calendario</h3>
+            <CalendarView citas={citas} />
           </div>
         )}
       </main>

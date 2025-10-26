@@ -13,6 +13,15 @@ interface Cita {
   motivo: string;
 }
 
+type View =
+  | 'citas'
+  | 'pacientes'
+  | 'habitaciones'
+  | 'historial'
+  | 'medicos'
+  | 'calendar'
+  | 'reportes';
+
 const ReceptionPanel: React.FC = () => {
   const { token, logout } = useAuth();
   const navigate = useNavigate();
@@ -21,20 +30,18 @@ const ReceptionPanel: React.FC = () => {
   const [fecha, setFecha] = useState('');
   const [hora, setHora] = useState('');
   const [motivo, setMotivo] = useState('');
-  const [view, setView] = useState<'citas' | 'calendar'>('citas');
+  const [view, setView] = useState<View>('citas');
 
   const fetchCitas = async () => {
     try {
-      const res = await api.get('/api/citas', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
       setCitas(res.data);
     } catch (error) {
       console.error('Error al obtener citas', error);
     }
   };
 
-  const create = async () => {
+  const createCita = async () => {
     if (!paciente || !fecha || !hora || !motivo) return;
     try {
       const res = await api.post(
@@ -52,11 +59,9 @@ const ReceptionPanel: React.FC = () => {
     }
   };
 
-  const remove = async (id: number) => {
+  const removeCita = async (id: number) => {
     try {
-      await api.delete(`/api/citas/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/api/citas/${id}`, { headers: { Authorization: `Bearer ${token}` } });
       setCitas(prev => prev.filter(c => c.id !== id));
     } catch (error) {
       console.error('Error al eliminar cita', error);
@@ -83,11 +88,12 @@ const ReceptionPanel: React.FC = () => {
           <h1 className="text-2xl font-bold text-blue-600 mb-6">MENÚ</h1>
           <nav className="space-y-4">
             <button className="text-left w-full" onClick={() => setView('citas')}>Citas</button>
-            <p className="text-gray-700">Tipo Consulta</p>
-            <p className="text-gray-700">Clientes</p>
-            <p className="text-gray-700">Doctores</p>
+            <button className="text-left w-full" onClick={() => setView('pacientes')}>Pacientes</button>
+            <button className="text-left w-full" onClick={() => setView('habitaciones')}>Habitaciones</button>
+            <button className="text-left w-full" onClick={() => setView('historial')}>Historial Clínico</button>
+            <button className="text-left w-full" onClick={() => setView('medicos')}>Médicos</button>
             <button className="text-left w-full" onClick={() => setView('calendar')}>Calendario</button>
-            <p className="text-gray-700">Reportes</p>
+            <button className="text-left w-full" onClick={() => setView('reportes')}>Reportes</button>
           </nav>
         </div>
         <button
@@ -114,47 +120,44 @@ const ReceptionPanel: React.FC = () => {
           </div>
         </div>
 
+        {/* Vistas según menú */}
         {view === 'citas' && (
-          <>
-            {/* Crear cita */}
-            <div className="bg-white p-6 rounded shadow-md mb-8">
-              <h3 className="text-lg font-semibold text-gray-700 mb-4">Crear nueva cita</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input
-                  value={paciente}
-                  onChange={e => setPaciente(e.target.value)}
-                  placeholder="Nombre del paciente"
-                  className="p-3 border rounded"
-                />
-                <input
-                  type="date"
-                  value={fecha}
-                  onChange={e => setFecha(e.target.value)}
-                  className="p-3 border rounded"
-                />
-                <input
-                  type="time"
-                  value={hora}
-                  onChange={e => setHora(e.target.value)}
-                  className="p-3 border rounded"
-                />
-                <input
-                  value={motivo}
-                  onChange={e => setMotivo(e.target.value)}
-                  placeholder="Motivo"
-                  className="p-3 border rounded"
-                />
-              </div>
-              <button
-                onClick={create}
-                className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
-              >
-                Agendar cita
-              </button>
+          <div className="bg-white p-6 rounded shadow-md mb-8">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Crear nueva cita</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input
+                value={paciente}
+                onChange={e => setPaciente(e.target.value)}
+                placeholder="Nombre del paciente"
+                className="p-3 border rounded"
+              />
+              <input
+                type="date"
+                value={fecha}
+                onChange={e => setFecha(e.target.value)}
+                className="p-3 border rounded"
+              />
+              <input
+                type="time"
+                value={hora}
+                onChange={e => setHora(e.target.value)}
+                className="p-3 border rounded"
+              />
+              <input
+                value={motivo}
+                onChange={e => setMotivo(e.target.value)}
+                placeholder="Motivo"
+                className="p-3 border rounded"
+              />
             </div>
+            <button
+              onClick={createCita}
+              className="mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+            >
+              Agendar cita
+            </button>
 
-            {/* Lista de citas */}
-            <h3 className="text-lg font-semibold text-gray-700 mb-4">Citas agendadas</h3>
+            <h3 className="text-lg font-semibold text-gray-700 mt-6 mb-4">Citas agendadas</h3>
             {citas.length === 0 ? (
               <p className="text-gray-500">No hay citas aún.</p>
             ) : (
@@ -169,15 +172,15 @@ const ReceptionPanel: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {citas.map(cita => (
-                    <tr key={cita.id} className="border-t">
-                      <td className="p-3">{new Date(cita.fecha).toLocaleDateString('es-ES')}</td>
-                      <td className="p-3">{cita.hora}</td>
-                      <td className="p-3">{cita.paciente}</td>
-                      <td className="p-3">{cita.motivo}</td>
+                  {citas.map(c => (
+                    <tr key={c.id} className="border-t">
+                      <td className="p-3">{new Date(c.fecha).toLocaleDateString('es-ES')}</td>
+                      <td className="p-3">{c.hora}</td>
+                      <td className="p-3">{c.paciente}</td>
+                      <td className="p-3">{c.motivo}</td>
                       <td className="p-3">
                         <button
-                          onClick={() => remove(cita.id)}
+                          onClick={() => removeCita(c.id)}
                           className="text-red-500 hover:text-red-700"
                         >
                           Eliminar
@@ -188,7 +191,7 @@ const ReceptionPanel: React.FC = () => {
                 </tbody>
               </table>
             )}
-          </>
+          </div>
         )}
 
         {view === 'calendar' && (
@@ -197,6 +200,12 @@ const ReceptionPanel: React.FC = () => {
             <CalendarView citas={citas} />
           </div>
         )}
+
+        {view === 'pacientes' && <div>Modulo Pacientes</div>}
+        {view === 'habitaciones' && <div>Modulo Habitaciones</div>}
+        {view === 'historial' && <div>Modulo Historial Clínico</div>}
+        {view === 'medicos' && <div>Modulo Médicos</div>}
+        {view === 'reportes' && <div>Modulo Reportes</div>}
       </main>
     </div>
   );
