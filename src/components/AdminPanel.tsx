@@ -26,6 +26,7 @@ const AdminPanel: React.FC = () => {
   const [nrole, setNrole] = useState<typeof ROLES[number]>('recepcionista');
 
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
+  const [pId, setPId] = useState<number | null>(null);
   const [pDpi, setPDpi] = useState('');
   const [pNombre, setPNombre] = useState('');
   const [pApellidos, setPApellidos] = useState('');
@@ -47,14 +48,15 @@ const AdminPanel: React.FC = () => {
       fetchUsers(); 
       fetchPacientes(); 
       fetchCitas();
-      /* fetchInventario();
-      fetchEmpleados();
-      fetchHabitaciones();
-      fetchHistorial(); */
     }
   }, [token]);
 
-  const fetchUsers = async()=>{ try{ const r = await api.get('/api/users',{headers:{Authorization:`Bearer ${token}`}}); setUsers(r.data);}catch(e){setError('Error usuarios');}};
+  const fetchUsers = async()=>{ 
+    try{ 
+      const r = await api.get('/api/users',{headers:{Authorization:`Bearer ${token}`}}); 
+      setUsers(r.data);
+    }catch(e){setError('Error usuarios');}
+  };
   
   const fetchPacientes = async()=>{ 
     try{
@@ -74,7 +76,7 @@ const AdminPanel: React.FC = () => {
 
   const fetchCitas = async()=>{
     try{
-      const r = await api.get('/api/citas',{headers:{Authorization:`Bearer ${token}`}});
+      const r = await api.get('/api/citas',{headers:{Authorization:`Bearer ${token}`}}); 
       const data = r.data.map((c:any)=>({
         id: c.ID_CITA,
         paciente: c.PACIENTE,
@@ -85,34 +87,6 @@ const AdminPanel: React.FC = () => {
       setCitas(data);
     }catch(e){setError('Error citas');}
   };
-
-/*   const fetchInventario = async()=>{
-    try{
-      const r = await api.get('/api/inventario',{headers:{Authorization:`Bearer ${token}`}});
-      setInventario(r.data);
-    }catch(e){setError('Error inventario');}
-  };
-
-  const fetchEmpleados = async()=>{
-    try{
-      const r = await api.get('/api/empleados',{headers:{Authorization:`Bearer ${token}`}});
-      setEmpleados(r.data);
-    }catch(e){setError('Error empleados');}
-  };
-
-  const fetchHabitaciones = async()=>{
-    try{
-      const r = await api.get('/api/habitaciones',{headers:{Authorization:`Bearer ${token}`}});
-      setHabitaciones(r.data);
-    }catch(e){setError('Error habitaciones');}
-  };
-
-  const fetchHistorial = async()=>{
-    try{
-      const r = await api.get('/api/historial',{headers:{Authorization:`Bearer ${token}`}});
-      setHistorial(r.data);
-    }catch(e){setError('Error historial');}
-  }; */
 
   // ------------------ HELPERS ------------------
   const calcularEdad = (fecha: string) => {
@@ -125,33 +99,62 @@ const AdminPanel: React.FC = () => {
     return edad;
   };
 
-  // ------------------ CREATE ------------------
-  const createUser = async()=>{
-    try{
-      await api.post('/api/users',{username:nuser,password:npass,role:nrole},{headers:{Authorization:`Bearer ${token}`}}); 
-      setNuser(''); setNpass(''); fetchUsers();
-    }catch(e){setError('Error crear usuario');}
+  const limpiarFormulario = () => {
+    setPId(null);
+    setPDpi('');
+    setPNombre('');
+    setPApellidos('');
+    setPFechaNac('');
+    setPGenero('M');
+    setPDireccion('');
+    setPTelefono('');
+    setPEmail('');
   };
 
-  const createPaciente = async()=>{
+  // ------------------ CREATE / UPDATE ------------------
+  const createOrUpdatePaciente = async()=>{
     if(!pDpi || !pNombre || !pApellidos || !pFechaNac) return alert("Completa los campos requeridos");
     try{
-      await api.post('/api/pacientes',{
-        DPI:pDpi, NOMBRES:pNombre, APELLIDOS:pApellidos, FECHA_NAC:pFechaNac, SEXO:pGenero, DIRECCION:pDireccion, TELEFONO:pTelefono, EMAIL:pEmail, ID_SUCURSAL:1
-      },{headers:{Authorization:`Bearer ${token}`}});
-      alert('Paciente creado correctamente');
-      setPDpi(''); setPNombre(''); setPApellidos(''); setPFechaNac('');
-      setPGenero('M'); setPDireccion(''); setPTelefono(''); setPEmail('');
+      if(pId){ 
+        // UPDATE
+        await api.put(`/api/pacientes/${pId}`,{
+          DPI:pDpi, NOMBRES:pNombre, APELLIDOS:pApellidos, FECHA_NAC:pFechaNac, SEXO:pGenero,
+          DIRECCION:pDireccion, TELEFONO:pTelefono, EMAIL:pEmail, ID_SUCURSAL:1
+        },{headers:{Authorization:`Bearer ${token}`}});
+
+        alert('Paciente actualizado correctamente');
+      } else {
+        // CREATE
+        await api.post('/api/pacientes',{
+          DPI:pDpi, NOMBRES:pNombre, APELLIDOS:pApellidos, FECHA_NAC:pFechaNac, SEXO:pGenero,
+          DIRECCION:pDireccion, TELEFONO:pTelefono, EMAIL:pEmail, ID_SUCURSAL:1
+        },{headers:{Authorization:`Bearer ${token}`}});
+
+        alert('Paciente creado correctamente');
+      }
+      limpiarFormulario();
       fetchPacientes();
-    }catch(e){alert('Error creando paciente');}
+    }catch(e){alert('Error guardando paciente');}
   };
 
   // ------------------ DELETE ------------------
   const deleteItem = async(endpoint:string,id:number,setter:Function)=>{
     try{
-      await api.delete(`${endpoint}/${id}`,{headers:{Authorization:`Bearer ${token}`}});
+      await api.delete(`${endpoint}/${id}`,{headers:{Authorization:`Bearer ${token}`}}); 
       setter((prev:any)=>prev.filter((i:any)=>i.id!==id));
     }catch(err){console.error(err);}
+  };
+
+  // ------------------ EDITAR PACIENTE ------------------
+  const editarPaciente = (p: any) => {
+    setPId(p.id);
+    const [nombres, apellidos] = p.nombre.split(' ');
+    setPNombre(nombres);
+    setPApellidos(apellidos || '');
+    setPGenero(p.genero);
+    setPDireccion(p.direccion || '');
+    setPTelefono(p.telefono || '');
+    setPEmail(p.email || '');
   };
 
   // ------------------ RENDER ------------------
@@ -198,7 +201,7 @@ const AdminPanel: React.FC = () => {
               <select value={nrole} onChange={e=>setNrole(e.target.value as typeof ROLES[number])} className="p-2 border rounded">
                 {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
               </select>
-              <button onClick={createUser} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Crear</button>
+              <button onClick={createOrUpdatePaciente} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Crear</button>
             </div>
             <table className="w-full border text-left">
               <thead><tr className="bg-gray-200"><th>ID</th><th>Usuario</th><th>Rol</th><th>Creado por</th><th>Acciones</th></tr></thead>
@@ -235,15 +238,19 @@ const AdminPanel: React.FC = () => {
               <input value={pDireccion} onChange={e=>setPDireccion(e.target.value)} placeholder="Dirección" className="p-2 border rounded"/>
               <input value={pTelefono} onChange={e=>setPTelefono(e.target.value)} placeholder="Teléfono" className="p-2 border rounded"/>
               <input value={pEmail} onChange={e=>setPEmail(e.target.value)} placeholder="Correo" className="p-2 border rounded"/>
-              <button onClick={createPaciente} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 col-span-full">Crear</button>
+              <button onClick={createOrUpdatePaciente} className={`text-white px-4 py-2 rounded col-span-full ${pId ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'}`}>
+                {pId ? 'Actualizar Paciente' : 'Crear Paciente'}
+              </button>
+              {pId && <button onClick={limpiarFormulario} className="col-span-full bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancelar edición</button>}
             </div>
+
             <table className="w-full border text-left">
               <thead><tr className="bg-gray-200"><th>ID</th><th>Nombre</th><th>Edad</th><th>Género</th><th>Teléfono</th><th>Email</th><th>Acciones</th></tr></thead>
               <tbody>
                 {pacientes.map(p=>(
                   <tr key={p.id}>
                     <td className="p-2 border">{p.id}</td>
-                    <td className="p-2 border">{p.nombre}</td>
+                    <td className="p-2 border cursor-pointer text-blue-600 hover:underline" onClick={()=>editarPaciente(p)}>{p.nombre}</td>
                     <td className="p-2 border">{p.edad}</td>
                     <td className="p-2 border">{p.genero}</td>
                     <td className="p-2 border">{p.telefono}</td>
