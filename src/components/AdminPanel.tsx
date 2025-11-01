@@ -74,6 +74,27 @@ const AdminPanel: React.FC = () => {
     catch{setError('Error cargando usuarios');}
   };
 
+  // --- HELPERS ---
+const calcularEdad = (fecha: string) => {
+  if (!fecha) return 0;
+  const nac = new Date(fecha);
+  const hoy = new Date();
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const m = hoy.getMonth() - nac.getMonth();
+  if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad;
+};
+
+// --- FORMATEAR FECHA PARA <input type="date"> ---
+const formatDateForInput = (fecha: string) => {
+  if (!fecha) return '';
+  const d = new Date(fecha);
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
   const fetchCitas = async () => {
     try {
       const r = await api.get<{ ID_CITA: number; PACIENTE: string; FECHA: string; HORA: string; MOTIVO: string }[]>('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
@@ -153,15 +174,7 @@ const AdminPanel: React.FC = () => {
   };
 
   // --- HELPERS ---
-  const calcularEdad = (fecha: string) => {
-    if(!fecha) return 0;
-    const nac = new Date(fecha);
-    const hoy = new Date();
-    let edad = hoy.getFullYear() - nac.getFullYear();
-    const m = hoy.getMonth() - nac.getMonth();
-    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
-    return edad;
-  };
+
 
   const deleteItem = async <T extends { id: number }>(endpoint: string, id: number, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
     try { await api.delete(`${endpoint}/${id}`, { headers: { Authorization: `Bearer ${token}` } }); setter(prev => prev.filter(item => item.id !== id)); }
@@ -318,7 +331,8 @@ const AdminPanel: React.FC = () => {
                     <td className="p-2 border space-x-2">
                       <button onClick={()=>{
                         setPId(p.id); setPDpi(p.dpi||''); setPNombre(p.nombres); setPApellidos(p.apellidos);
-                        setPFechaNac(p.fechaNacimiento); setPGenero(p.genero); setPDireccion(p.direccion||'');
+                        setPFechaNac(formatDateForInput(p.fechaNacimiento));
+                        setPGenero(p.genero); setPDireccion(p.direccion||'');
                         setPTelefono(p.telefono||''); setPEmail(p.email||'');
                       }} className="text-blue-500 hover:underline">Editar</button>
                       <button onClick={()=>deleteItem('/api/pacientes',p.id,setPacientes)} className="text-red-500 hover:underline">Eliminar</button>
