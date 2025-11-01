@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../Api';
 import { useAuth } from '../AuthContext';
-//import CalendarView from './CalendarView';
 
 interface User { id: number; username: string; role: string; created_by: number | null; }
-interface Paciente { id: number; nombre: string; edad: number; genero: string; direccion?: string; telefono?: string; email?: string; }
-/* interface Inventario { id: number; nombre: string; cantidad: number; }
+interface Paciente { id: number; dpi?: string; nombres: string; apellidos: string; fechaNacimiento: string; genero: string; direccion?: string; telefono?: string; email?: string; }
+interface Inventario { id: number; nombre: string; cantidad: number; }
 interface Empleado { id: number; nombre: string; puesto: string; }
-interface Habitacion { id: number; numero: string; tipo: string; }
-interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; } */
+interface Habitacion { id: number; numero: string; tipo: string; estado: string; }
+interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; }
 interface Cita { id: number; paciente: string; fecha: string; hora: string; motivo: string; }
 
-const ROLES: Array<'admin' | 'recepcionista' | 'medico' | 'enfermero'> = ['admin','recepcionista','medico','enfermero'];
 type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas'|'calendar';
 
 const AdminPanel: React.FC = () => {
@@ -19,12 +17,8 @@ const AdminPanel: React.FC = () => {
   const [view, setView] = useState<View>('usuarios');
   const [error, setError] = useState('');
 
-  // --- Estados CRUD ---
+  // --- STATES ---
   const [users, setUsers] = useState<User[]>([]);
-  const [nuser, setNuser] = useState(''); 
-  const [npass, setNpass] = useState(''); 
-  const [nrole, setNrole] = useState<typeof ROLES[number]>('recepcionista');
-
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [pId, setPId] = useState<number | null>(null);
   const [pDpi, setPDpi] = useState('');
@@ -36,48 +30,54 @@ const AdminPanel: React.FC = () => {
   const [pTelefono, setPTelefono] = useState('');
   const [pEmail, setPEmail] = useState('');
 
-  /* const [inventario, setInventario] = useState<Inventario[]>([]);
+  const [inventario, setInventario] = useState<Inventario[]>([]);
+  const [iId, setIId] = useState<number | null>(null);
+  const [iNombre, setINombre] = useState('');
+  const [iCantidad, setICantidad] = useState('');
+
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
+  const [eId, setEId] = useState<number | null>(null);
+  const [eNombre, setENombre] = useState('');
+  const [ePuesto, setEPuesto] = useState('');
+
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
-  const [historial, setHistorial] = useState<Historial[]>([]); */
+  const [hId, setHId] = useState<number | null>(null);
+  const [hNumero, setHNumero] = useState('');
+  const [hTipo, setHTipo] = useState('');
+  const [hEstado, setHEstado] = useState('');
+
+  const [historial, setHistorial] = useState<Historial[]>([]);
+  const [hisId, setHisId] = useState<number | null>(null);
+  const [hisPacienteId, setHisPacienteId] = useState('');
+  const [hisFecha, setHisFecha] = useState('');
+  const [hisDiagnostico, setHisDiagnostico] = useState('');
+  const [hisTratamiento, setHisTratamiento] = useState('');
+  const [hisNotas, setHisNotas] = useState('');
+
   const [citas, setCitas] = useState<Cita[]>([]);
 
-  // ------------------ FETCH ------------------
+  // --- FETCH DATA ---
   useEffect(() => {
     if(token){
-      fetchUsers(); 
-      fetchPacientes(); 
+      fetchUsers();
+      fetchPacientes();
+      fetchInventario();
+      fetchEmpleados();
+      fetchHabitaciones();
+      fetchHistorial();
       fetchCitas();
     }
   }, [token]);
 
   const fetchUsers = async()=>{ 
-    try{ 
-      const r = await api.get('/api/users',{headers:{Authorization:`Bearer ${token}`}}); 
-      setUsers(r.data);
-    }catch(e){setError('Error usuarios');}
-  };
-  
-  const fetchPacientes = async()=>{ 
-    try{
-      const r = await api.get('/api/pacientes',{headers:{Authorization:`Bearer ${token}`}}); 
-      const data = r.data.map((p:any)=>({
-        id: p.ID_PACIENTE,
-        nombre: `${p.NOMBRES} ${p.APELLIDOS}`,
-        edad: calcularEdad(p.FECHA_NAC),
-        genero: p.SEXO,
-        direccion: p.DIRECCION,
-        telefono: p.TELEFONO,
-        email: p.EMAIL
-      }));
-      setPacientes(data);
-    }catch(e){setError('Error pacientes');}
+    try{ const r = await api.get('/api/users',{headers:{Authorization:`Bearer ${token}`}}); setUsers(r.data);}
+    catch{setError('Error cargando usuarios');}
   };
 
-  const fetchCitas = async()=>{
-    try{
-      const r = await api.get('/api/citas',{headers:{Authorization:`Bearer ${token}`}}); 
-      const data = r.data.map((c:any)=>({
+  const fetchCitas = async () => {
+    try {
+      const r = await api.get<{ ID_CITA: number; PACIENTE: string; FECHA: string; HORA: string; MOTIVO: string }[]>('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
+      const data: Cita[] = r.data.map(c => ({
         id: c.ID_CITA,
         paciente: c.PACIENTE,
         fecha: c.FECHA,
@@ -85,10 +85,74 @@ const AdminPanel: React.FC = () => {
         motivo: c.MOTIVO
       }));
       setCitas(data);
-    }catch(e){setError('Error citas');}
+    } catch { setError('Error cargando citas'); }
   };
 
-  // ------------------ HELPERS ------------------
+  const fetchHistorial = async () => {
+    try {
+      const r = await api.get<{ ID_HISTORIAL: number; ID_PACIENTE: number; FECHA: string; DIAGNOSTICO: string; TRATAMIENTO: string; NOTAS: string }[]>('/api/historial', { headers: { Authorization: `Bearer ${token}` } });
+      const data: Historial[] = r.data.map(h => ({
+        id: h.ID_HISTORIAL,
+        pacienteId: h.ID_PACIENTE,
+        fecha: h.FECHA,
+        diagnostico: h.DIAGNOSTICO,
+        tratamiento: h.TRATAMIENTO,
+        notas: h.NOTAS
+      }));
+      setHistorial(data);
+    } catch { setError('Error cargando historial clínico'); }
+  };
+
+  const fetchPacientes = async () => {
+    try {
+      const r = await api.get<{ ID_PACIENTE: number; DPI?: string; NOMBRES: string; APELLIDOS: string; FECHA_NAC: string; SEXO: string; DIRECCION?: string; TELEFONO?: string; EMAIL?: string }[]>('/api/pacientes', { headers: { Authorization: `Bearer ${token}` } });
+      const data: Paciente[] = r.data.map(p => ({
+        id: p.ID_PACIENTE,
+        dpi: p.DPI,
+        nombres: p.NOMBRES,
+        apellidos: p.APELLIDOS,
+        fechaNacimiento: p.FECHA_NAC,
+        genero: p.SEXO,
+        direccion: p.DIRECCION,
+        telefono: p.TELEFONO,
+        email: p.EMAIL
+      }));
+      setPacientes(data);
+    } catch { setError('Error cargando pacientes'); }
+  };
+
+ const fetchInventario = async () => {
+  try {
+    const r = await api.get<{ ID_PRODUCTO: number; NOMBRE: string; STOCK: number }[]>('/api/productos', { headers: { Authorization: `Bearer ${token}` } });
+    const data: Inventario[] = r.data.map(p => ({
+      id: p.ID_PRODUCTO,
+      nombre: p.NOMBRE,
+      cantidad: p.STOCK // ahora sí tomamos STOCK
+    }));
+    setInventario(data);
+  } catch {
+    setError('Error cargando inventario');
+  }
+};
+
+
+  const fetchEmpleados = async () => {
+    try {
+      const r = await api.get<{ ID_EMPLEADO: number; NOMBRE: string; PUESTO: string }[]>('/api/empleados', { headers: { Authorization: `Bearer ${token}` } });
+      const data: Empleado[] = r.data.map(e => ({ id: e.ID_EMPLEADO, nombre: e.NOMBRE, puesto: e.PUESTO }));
+      setEmpleados(data);
+    } catch { setError('Error cargando empleados'); }
+  };
+
+  const fetchHabitaciones = async () => {
+    try {
+      const r = await api.get<{ ID_HABITACION: number; NUMERO: string; TIPO: string; ESTADO: string }[]>('/api/habitaciones', { headers: { Authorization: `Bearer ${token}` } });
+      const data: Habitacion[] = r.data.map(h => ({ id: h.ID_HABITACION, numero: h.NUMERO, tipo: h.TIPO, estado: h.ESTADO }));
+      setHabitaciones(data);
+    } catch { setError('Error cargando habitaciones'); }
+  };
+
+  // --- HELPERS ---
   const calcularEdad = (fecha: string) => {
     if(!fecha) return 0;
     const nac = new Date(fecha);
@@ -99,65 +163,87 @@ const AdminPanel: React.FC = () => {
     return edad;
   };
 
-  const limpiarFormulario = () => {
-    setPId(null);
-    setPDpi('');
-    setPNombre('');
-    setPApellidos('');
-    setPFechaNac('');
-    setPGenero('M');
-    setPDireccion('');
-    setPTelefono('');
-    setPEmail('');
+  const deleteItem = async <T extends { id: number }>(endpoint: string, id: number, setter: React.Dispatch<React.SetStateAction<T[]>>) => {
+    try { await api.delete(`${endpoint}/${id}`, { headers: { Authorization: `Bearer ${token}` } }); setter(prev => prev.filter(item => item.id !== id)); }
+    catch(err){ console.error(err); }
   };
 
-  // ------------------ CREATE / UPDATE ------------------
+  // --- CRUD PACIENTES ---
+  const limpiarPaciente = ()=>{
+    setPId(null); setPDpi(''); setPNombre(''); setPApellidos('');
+    setPFechaNac(''); setPGenero('M'); setPDireccion(''); setPTelefono(''); setPEmail('');
+  };
   const createOrUpdatePaciente = async()=>{
-    if(!pDpi || !pNombre || !pApellidos || !pFechaNac) return alert("Completa los campos requeridos");
+    if(!pNombre||!pApellidos||!pFechaNac) return alert("Completa los campos requeridos");
     try{
-      if(pId){ 
-        // UPDATE
-        await api.put(`/api/pacientes/${pId}`,{
-          DPI:pDpi, NOMBRES:pNombre, APELLIDOS:pApellidos, FECHA_NAC:pFechaNac, SEXO:pGenero,
-          DIRECCION:pDireccion, TELEFONO:pTelefono, EMAIL:pEmail, ID_SUCURSAL:1
-        },{headers:{Authorization:`Bearer ${token}`}});
-
-        alert('Paciente actualizado correctamente');
-      } else {
-        // CREATE
-        await api.post('/api/pacientes',{
-          DPI:pDpi, NOMBRES:pNombre, APELLIDOS:pApellidos, FECHA_NAC:pFechaNac, SEXO:pGenero,
-          DIRECCION:pDireccion, TELEFONO:pTelefono, EMAIL:pEmail, ID_SUCURSAL:1
-        },{headers:{Authorization:`Bearer ${token}`}});
-
-        alert('Paciente creado correctamente');
-      }
-      limpiarFormulario();
-      fetchPacientes();
-    }catch(e){alert('Error guardando paciente');}
+      const body = { DPI:pDpi,NOMBRES:pNombre,APELLIDOS:pApellidos,FECHA_NAC:pFechaNac,SEXO:pGenero,DIRECCION:pDireccion,TELEFONO:pTelefono,EMAIL:pEmail,ID_SUCURSAL:1 };
+      if(pId){ await api.put(`/api/pacientes/${pId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Paciente actualizado'); }
+      else { await api.post(`/api/pacientes`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Paciente creado'); }
+      limpiarPaciente(); fetchPacientes();
+    } catch { alert('Error al guardar paciente'); }
   };
 
-  // ------------------ DELETE ------------------
-  const deleteItem = async(endpoint:string,id:number,setter:Function)=>{
+  // --- CRUD INVENTARIO ---
+  const limpiarInventario=()=>{setIId(null); setINombre(''); setICantidad('');};
+ const createOrUpdateInventario = async () => {
+  if(!iNombre || iCantidad === '') return alert("Completa todos los campos");
+  try{
+    const body = {
+      NOMBRE: iNombre,
+      STOCK: Number(iCantidad), // enviamos STOCK a la DB
+    };
+    if(iId){
+      await api.put(`/api/productos/${iId}`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Producto actualizado');
+    } else {
+      await api.post(`/api/productos`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Producto creado');
+    }
+    limpiarInventario();
+    fetchInventario();
+  } catch {
+    alert('Error al guardar producto');
+  }
+};
+
+
+  // --- CRUD EMPLEADOS ---
+  const limpiarEmpleado=()=>{setEId(null); setENombre(''); setEPuesto('');};
+  const createOrUpdateEmpleado=async()=>{
+    if(!eNombre||!ePuesto) return alert("Completa los campos");
     try{
-      await api.delete(`${endpoint}/${id}`,{headers:{Authorization:`Bearer ${token}`}}); 
-      setter((prev:any)=>prev.filter((i:any)=>i.id!==id));
-    }catch(err){console.error(err);}
+      const body = {NOMBRE:eNombre,PUESTO:ePuesto};
+      if(eId){ await api.put(`/api/empleados/${eId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Empleado actualizado'); }
+      else { await api.post(`/api/empleados`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Empleado creado'); }
+      limpiarEmpleado(); fetchEmpleados();
+    } catch { alert('Error al guardar empleado'); }
   };
 
-  // ------------------ EDITAR PACIENTE ------------------
-  const editarPaciente = (p: any) => {
-    setPId(p.id);
-    const [nombres, apellidos] = p.nombre.split(' ');
-    setPNombre(nombres);
-    setPApellidos(apellidos || '');
-    setPGenero(p.genero);
-    setPDireccion(p.direccion || '');
-    setPTelefono(p.telefono || '');
-    setPEmail(p.email || '');
+  // --- CRUD HABITACIONES ---
+  const limpiarHabitacion=()=>{setHId(null); setHNumero(''); setHTipo(''); setHEstado('');};
+  const createOrUpdateHabitacion=async()=>{
+    if(!hNumero||!hTipo||!hEstado) return alert("Completa todos los campos");
+    try{
+      const body = {NUMERO:hNumero,TIPO:hTipo,ESTADO:hEstado};
+      if(hId){ await api.put(`/api/habitaciones/${hId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Habitación actualizada'); }
+      else { await api.post(`/api/habitaciones`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Habitación creada'); }
+      limpiarHabitacion(); fetchHabitaciones();
+    } catch { alert('Error al guardar habitación'); }
   };
 
-  // ------------------ RENDER ------------------
+  // --- CRUD HISTORIAL ---
+  const limpiarHistorial=()=>{setHisId(null); setHisPacienteId(''); setHisFecha(''); setHisDiagnostico(''); setHisTratamiento(''); setHisNotas('');};
+  const createOrUpdateHistorial=async()=>{
+    if(!hisPacienteId||!hisDiagnostico) return alert("Completa los campos requeridos");
+    try{
+      const body = {ID_PACIENTE:hisPacienteId,FECHA:hisFecha,DIAGNOSTICO:hisDiagnostico,TRATAMIENTO:hisTratamiento,NOTAS:hisNotas};
+      if(hisId){ await api.put(`/api/historial/${hisId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Historial actualizado'); }
+      else { await api.post(`/api/historial`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Historial creado'); }
+      limpiarHistorial(); fetchHistorial();
+    } catch { alert('Error al guardar historial'); }
+  };
+
+  // --- RENDER ---
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
@@ -165,64 +251,40 @@ const AdminPanel: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-blue-600 mb-6">MENÚ</h1>
           <nav className="space-y-3">
-            {[
-              {v:'usuarios',t:'Usuarios'},
-              {v:'pacientes',t:'Pacientes'},
-              {v:'inventario',t:'Inventario'},
-              {v:'empleados',t:'Empleados'},
-              {v:'habitaciones',t:'Habitaciones'},
-              {v:'historial',t:'Historial Clínico'},
-              {v:'citas',t:'Citas Agendadas'},
-              {v:'calendar',t:'Calendario'}
-            ].map(({v,t})=>(
+            {['usuarios','pacientes','inventario','empleados','habitaciones','historial','citas','calendar'].map(v=>(
               <button key={v} className={`text-left w-full p-2 rounded hover:bg-blue-100 ${view===v?'bg-blue-50':''}`} onClick={()=>setView(v as View)}>
-                {t}
+                {v.charAt(0).toUpperCase()+v.slice(1)}
               </button>
             ))}
           </nav>
         </div>
-        <button onClick={logout} className="bg-red-500 text-white mt-6 px-4 py-2 rounded hover:bg-red-600">
-          Cerrar sesión
-        </button>
+        <button onClick={logout} className="bg-red-500 text-white mt-6 px-4 py-2 rounded hover:bg-red-600">Cerrar sesión</button>
       </aside>
 
-      {/* Main */}
       <main className="flex-1 p-8 overflow-y-auto">
         <h2 className="text-2xl font-bold text-gray-800 mb-6">Panel de Administrador</h2>
         {error && <p className="text-red-500 mb-4">{error}</p>}
 
-        {/* --- Usuarios --- */}
+        {/* USUARIOS */}
         {view==='usuarios' && (
           <div className="bg-white p-6 rounded shadow-md mb-6">
             <h3 className="text-lg font-semibold mb-4">Usuarios</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <input value={nuser} onChange={e=>setNuser(e.target.value)} placeholder="Usuario" className="p-2 border rounded"/>
-              <input type="password" value={npass} onChange={e=>setNpass(e.target.value)} placeholder="Contraseña" className="p-2 border rounded"/>
-              <select value={nrole} onChange={e=>setNrole(e.target.value as typeof ROLES[number])} className="p-2 border rounded">
-                {ROLES.map(r=><option key={r} value={r}>{r}</option>)}
-              </select>
-              <button onClick={createOrUpdatePaciente} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Crear</button>
-            </div>
             <table className="w-full border text-left">
               <thead><tr className="bg-gray-200"><th>ID</th><th>Usuario</th><th>Rol</th><th>Creado por</th><th>Acciones</th></tr></thead>
               <tbody>
-                {users.map(u=>(
-                  <tr key={u.id}>
-                    <td className="p-2 border">{u.id}</td>
-                    <td className="p-2 border">{u.username}</td>
-                    <td className="p-2 border">{u.role}</td>
-                    <td className="p-2 border">{u.created_by ?? 'N/A'}</td>
-                    <td className="p-2 border">
-                      <button className="text-red-500 hover:text-red-700" onClick={()=>deleteItem('/api/users',u.id,setUsers)}>Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
+                {users.map(u=>(<tr key={u.id}>
+                  <td className="p-2 border">{u.id}</td>
+                  <td className="p-2 border">{u.username}</td>
+                  <td className="p-2 border">{u.role}</td>
+                  <td className="p-2 border">{u.created_by ?? 'N/A'}</td>
+                  <td className="p-2 border"><button className="text-red-500 hover:text-red-700" onClick={()=>deleteItem('/api/users',u.id,setUsers)}>Eliminar</button></td>
+                </tr>))}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* --- Pacientes --- */}
+        {/* PACIENTES */}
         {view==='pacientes' && (
           <div className="bg-white p-6 rounded shadow-md mb-6">
             <h3 className="text-lg font-semibold mb-4">Pacientes</h3>
@@ -232,31 +294,34 @@ const AdminPanel: React.FC = () => {
               <input value={pApellidos} onChange={e=>setPApellidos(e.target.value)} placeholder="Apellidos" className="p-2 border rounded"/>
               <input type="date" value={pFechaNac} onChange={e=>setPFechaNac(e.target.value)} className="p-2 border rounded"/>
               <select value={pGenero} onChange={e=>setPGenero(e.target.value)} className="p-2 border rounded">
-                <option value="M">Masculino</option>
-                <option value="F">Femenino</option>
+                <option value="M">Masculino</option><option value="F">Femenino</option>
               </select>
               <input value={pDireccion} onChange={e=>setPDireccion(e.target.value)} placeholder="Dirección" className="p-2 border rounded"/>
               <input value={pTelefono} onChange={e=>setPTelefono(e.target.value)} placeholder="Teléfono" className="p-2 border rounded"/>
               <input value={pEmail} onChange={e=>setPEmail(e.target.value)} placeholder="Correo" className="p-2 border rounded"/>
-              <button onClick={createOrUpdatePaciente} className={`text-white px-4 py-2 rounded col-span-full ${pId ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'}`}>
-                {pId ? 'Actualizar Paciente' : 'Crear Paciente'}
-              </button>
-              {pId && <button onClick={limpiarFormulario} className="col-span-full bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500">Cancelar edición</button>}
             </div>
-
+            <div className="space-x-2 mb-4">
+              <button onClick={createOrUpdatePaciente} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{pId?'Actualizar':'Crear'}</button>
+              <button onClick={limpiarPaciente} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+            </div>
             <table className="w-full border text-left">
-              <thead><tr className="bg-gray-200"><th>ID</th><th>Nombre</th><th>Edad</th><th>Género</th><th>Teléfono</th><th>Email</th><th>Acciones</th></tr></thead>
+              <thead><tr className="bg-gray-200"><th>ID</th><th>DPI</th><th>Nombre</th><th>Apellidos</th><th>Edad</th><th>Género</th><th>Acciones</th></tr></thead>
               <tbody>
                 {pacientes.map(p=>(
                   <tr key={p.id}>
                     <td className="p-2 border">{p.id}</td>
-                    <td className="p-2 border cursor-pointer text-blue-600 hover:underline" onClick={()=>editarPaciente(p)}>{p.nombre}</td>
-                    <td className="p-2 border">{p.edad}</td>
+                    <td className="p-2 border">{p.dpi}</td>
+                    <td className="p-2 border">{p.nombres}</td>
+                    <td className="p-2 border">{p.apellidos}</td>
+                    <td className="p-2 border">{calcularEdad(p.fechaNacimiento)}</td>
                     <td className="p-2 border">{p.genero}</td>
-                    <td className="p-2 border">{p.telefono}</td>
-                    <td className="p-2 border">{p.email}</td>
-                    <td className="p-2 border">
-                      <button className="text-red-500 hover:text-red-700" onClick={()=>deleteItem('/api/pacientes',p.id,setPacientes)}>Eliminar</button>
+                    <td className="p-2 border space-x-2">
+                      <button onClick={()=>{
+                        setPId(p.id); setPDpi(p.dpi||''); setPNombre(p.nombres); setPApellidos(p.apellidos);
+                        setPFechaNac(p.fechaNacimiento); setPGenero(p.genero); setPDireccion(p.direccion||'');
+                        setPTelefono(p.telefono||''); setPEmail(p.email||'');
+                      }} className="text-blue-500 hover:underline">Editar</button>
+                      <button onClick={()=>deleteItem('/api/pacientes',p.id,setPacientes)} className="text-red-500 hover:underline">Eliminar</button>
                     </td>
                   </tr>
                 ))}
@@ -265,10 +330,157 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {/* --- Citas --- */}
+        {/* Inventario */}
+{view==='inventario' && (
+  <div className="bg-white p-6 rounded shadow-md mb-6">
+    <h3 className="text-lg font-semibold mb-4">Inventario</h3>
+    <div className="flex gap-2 mb-4">
+      <input value={iNombre} onChange={e=>setINombre(e.target.value)} placeholder="Nombre" className="p-2 border rounded"/>
+      <input
+        type="number"
+        value={iCantidad}
+        onChange={e=>setICantidad(e.target.value)}
+        placeholder="Cantidad"
+        className="p-2 border rounded"
+      />
+      <button onClick={createOrUpdateInventario} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{iId?'Actualizar':'Crear'}</button>
+      <button onClick={limpiarInventario} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+    </div>
+    <table className="w-full border text-left">
+      <thead>
+        <tr className="bg-gray-200"><th>ID</th><th>Nombre</th><th>Cantidad</th><th>Acciones</th></tr>
+      </thead>
+      <tbody>
+        {inventario.map(i=>(
+          <tr key={i.id}>
+            <td className="p-2 border">{i.id}</td>
+            <td className="p-2 border">{i.nombre}</td>
+            <td className="p-2 border">{i.cantidad}</td>
+            <td className="p-2 border space-x-2">
+              <button
+                onClick={()=>{
+                  setIId(i.id);
+                  setINombre(i.nombre);
+                  setICantidad(i.cantidad.toString()); // Convertimos a string para el input
+                }}
+                className="text-blue-500 hover:underline"
+              >Editar</button>
+              <button onClick={()=>deleteItem('/api/productos',i.id,setInventario)} className="text-red-500 hover:underline">Eliminar</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+
+        {/* EMPLEADOS */}
+        {view==='empleados' && (
+          <div className="bg-white p-6 rounded shadow-md mb-6">
+            <h3 className="text-lg font-semibold mb-4">Empleados</h3>
+            <div className="flex gap-2 mb-4">
+              <input value={eNombre} onChange={e=>setENombre(e.target.value)} placeholder="Nombre" className="p-2 border rounded"/>
+              <input value={ePuesto} onChange={e=>setEPuesto(e.target.value)} placeholder="Puesto" className="p-2 border rounded"/>
+              <button onClick={createOrUpdateEmpleado} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{eId?'Actualizar':'Crear'}</button>
+              <button onClick={limpiarEmpleado} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+            </div>
+            <table className="w-full border text-left">
+              <thead><tr className="bg-gray-200"><th>ID</th><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {empleados.map(e=>(
+                  <tr key={e.id}>
+                    <td className="p-2 border">{e.id}</td>
+                    <td className="p-2 border">{e.nombre}</td>
+                    <td className="p-2 border">{e.puesto}</td>
+                    <td className="p-2 border space-x-2">
+                      <button onClick={()=>{setEId(e.id); setENombre(e.nombre); setEPuesto(e.puesto);}} className="text-blue-500 hover:underline">Editar</button>
+                      <button onClick={()=>deleteItem('/api/empleados',e.id,setEmpleados)} className="text-red-500 hover:underline">Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* HABITACIONES */}
+        {view==='habitaciones' && (
+          <div className="bg-white p-6 rounded shadow-md mb-6">
+            <h3 className="text-lg font-semibold mb-4">Habitaciones</h3>
+            <div className="flex gap-2 mb-4">
+              <input value={hNumero} onChange={e=>setHNumero(e.target.value)} placeholder="Número" className="p-2 border rounded"/>
+              <input value={hTipo} onChange={e=>setHTipo(e.target.value)} placeholder="Tipo" className="p-2 border rounded"/>
+              <input value={hEstado} onChange={e=>setHEstado(e.target.value)} placeholder="Estado" className="p-2 border rounded"/>
+              <button onClick={createOrUpdateHabitacion} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{hId?'Actualizar':'Crear'}</button>
+              <button onClick={limpiarHabitacion} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+            </div>
+            <table className="w-full border text-left">
+              <thead><tr className="bg-gray-200"><th>ID</th><th>Número</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {habitaciones.map(h=>(
+                  <tr key={h.id}>
+                    <td className="p-2 border">{h.id}</td>
+                    <td className="p-2 border">{h.numero}</td>
+                    <td className="p-2 border">{h.tipo}</td>
+                    <td className="p-2 border">{h.estado}</td>
+                    <td className="p-2 border space-x-2">
+                      <button onClick={()=>{setHId(h.id); setHNumero(h.numero); setHTipo(h.tipo); setHEstado(h.estado);}} className="text-blue-500 hover:underline">Editar</button>
+                      <button onClick={()=>deleteItem('/api/habitaciones',h.id,setHabitaciones)} className="text-red-500 hover:underline">Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* HISTORIAL */}
+        {view==='historial' && (
+          <div className="bg-white p-6 rounded shadow-md mb-6">
+            <h3 className="text-lg font-semibold mb-4">Historial Clínico</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <select value={hisPacienteId} onChange={e=>setHisPacienteId(e.target.value)} className="p-2 border rounded">
+                <option value="">Selecciona paciente</option>
+                {pacientes.map(p=><option key={p.id} value={p.id}>{p.nombres} {p.apellidos}</option>)}
+              </select>
+              <input type="date" value={hisFecha} onChange={e=>setHisFecha(e.target.value)} className="p-2 border rounded"/>
+              <input value={hisDiagnostico} onChange={e=>setHisDiagnostico(e.target.value)} placeholder="Diagnóstico" className="p-2 border rounded"/>
+              <input value={hisTratamiento} onChange={e=>setHisTratamiento(e.target.value)} placeholder="Tratamiento" className="p-2 border rounded"/>
+              <input value={hisNotas} onChange={e=>setHisNotas(e.target.value)} placeholder="Notas" className="p-2 border rounded"/>
+            </div>
+            <div className="space-x-2 mb-4">
+              <button onClick={createOrUpdateHistorial} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{hisId?'Actualizar':'Crear'}</button>
+              <button onClick={limpiarHistorial} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+            </div>
+            <table className="w-full border text-left">
+              <thead><tr className="bg-gray-200"><th>ID</th><th>Paciente</th><th>Fecha</th><th>Diagnóstico</th><th>Tratamiento</th><th>Notas</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {historial.map(h=>(
+                  <tr key={h.id}>
+                    <td className="p-2 border">{h.id}</td>
+                    <td className="p-2 border">{pacientes.find(p=>p.id===h.pacienteId)?.nombres ?? ''} {pacientes.find(p=>p.id===h.pacienteId)?.apellidos ?? ''}</td>
+                    <td className="p-2 border">{h.fecha}</td>
+                    <td className="p-2 border">{h.diagnostico}</td>
+                    <td className="p-2 border">{h.tratamiento}</td>
+                    <td className="p-2 border">{h.notas}</td>
+                    <td className="p-2 border space-x-2">
+                      <button onClick={()=>{
+                        setHisId(h.id); setHisPacienteId(String(h.pacienteId)); setHisFecha(h.fecha); setHisDiagnostico(h.diagnostico); setHisTratamiento(h.tratamiento); setHisNotas(h.notas);
+                      }} className="text-blue-500 hover:underline">Editar</button>
+                      <button onClick={()=>deleteItem('/api/historial',h.id,setHistorial)} className="text-red-500 hover:underline">Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Citas */}
         {view==='citas' && (
           <div className="bg-white p-6 rounded shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-4">Citas Agendadas</h3>
+            <h3 className="text-lg font-semibold mb-4">Citas</h3>
             <table className="w-full border text-left">
               <thead><tr className="bg-gray-200"><th>ID</th><th>Paciente</th><th>Fecha</th><th>Hora</th><th>Motivo</th></tr></thead>
               <tbody>
@@ -286,12 +498,9 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
-        {/* --- Calendario --- */}
-        {view==='calendar' && (
-          <div className="bg-white p-6 rounded shadow-md mb-6">
-            {/* <CalendarView citas={citas}/> */}
-          </div>
-        )}
+        {/* Calendar placeholder */}
+        {view==='calendar' && <div className="bg-white p-6 rounded shadow-md">Calendario (pendiente de implementación)</div>}
+
       </main>
     </div>
   );
