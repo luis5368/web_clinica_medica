@@ -5,7 +5,16 @@ import { useAuth } from '../AuthContext';
 interface User { id: number; username: string; role: string; created_by: number | null; }
 interface Paciente { id: number; dpi?: string; nombres: string; apellidos: string; fechaNacimiento: string; genero: string; direccion?: string; telefono?: string; email?: string; }
 interface Inventario { id: number; nombre: string; cantidad: number; }
-interface Empleado { id: number; nombre: string; puesto: string; }
+interface Empleado {
+  id: number;
+  nombre: string;
+  apellidos: string;
+  puesto: string;         // CARGO
+  especialidad?: string;
+  telefono?: string;
+  email?: string;
+}
+
 interface Habitacion { id: number; numero: string; tipo: string; estado: string; }
 interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; }
 interface Cita { id: number; paciente: string; fecha: string; hora: string; motivo: string; }
@@ -36,9 +45,14 @@ const AdminPanel: React.FC = () => {
   const [iCantidad, setICantidad] = useState('');
 
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
-  const [eId, setEId] = useState<number | null>(null);
-  const [eNombre, setENombre] = useState('');
-  const [ePuesto, setEPuesto] = useState('');
+const [eId, setEId] = useState<number | null>(null);
+const [eNombre, setENombre] = useState('');
+const [eApellidos, setEApellidos] = useState('');
+const [ePuesto, setEPuesto] = useState('');
+const [eEspecialidad, setEEspecialidad] = useState('');
+const [eTelefono, setETelefono] = useState('');
+const [eEmail, setEEmail] = useState('');
+
 
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
   const [hId, setHId] = useState<number | null>(null);
@@ -156,14 +170,25 @@ const formatDateForInput = (fecha: string) => {
   }
 };
 
+  /*fetch empleados*/
+  const fetchEmpleados = async () => { 
+  try {
+    const r = await api.get<{ ID_PERSONAL: number; NOMBRES: string; APELLIDOS: string; CARGO: string; ESPECIALIDAD?: string; TELEFONO?: string; EMAIL?: string }[]>('/api/empleados', { headers: { Authorization: `Bearer ${token}` } });
+    const data: Empleado[] = r.data.map(e => ({
+      id: e.ID_PERSONAL,
+      nombre: e.NOMBRES,
+      puesto: e.CARGO,
+      apellidos: e.APELLIDOS,
+      especialidad: e.ESPECIALIDAD || '',
+      telefono: e.TELEFONO || '',
+      email: e.EMAIL || ''
+    }));
+    setEmpleados(data);
+  } catch {
+    setError('Error cargando empleados');
+  }
+};
 
-  const fetchEmpleados = async () => {
-    try {
-      const r = await api.get<{ ID_EMPLEADO: number; NOMBRE: string; PUESTO: string }[]>('/api/empleados', { headers: { Authorization: `Bearer ${token}` } });
-      const data: Empleado[] = r.data.map(e => ({ id: e.ID_EMPLEADO, nombre: e.NOMBRE, puesto: e.PUESTO }));
-      setEmpleados(data);
-    } catch { setError('Error cargando empleados'); }
-  };
 
   const fetchHabitaciones = async () => {
     try {
@@ -222,15 +247,36 @@ const formatDateForInput = (fecha: string) => {
 
   // --- CRUD EMPLEADOS ---
   const limpiarEmpleado=()=>{setEId(null); setENombre(''); setEPuesto('');};
-  const createOrUpdateEmpleado=async()=>{
-    if(!eNombre||!ePuesto) return alert("Completa los campos");
-    try{
-      const body = {NOMBRE:eNombre,PUESTO:ePuesto};
-      if(eId){ await api.put(`/api/empleados/${eId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Empleado actualizado'); }
-      else { await api.post(`/api/empleados`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Empleado creado'); }
-      limpiarEmpleado(); fetchEmpleados();
-    } catch { alert('Error al guardar empleado'); }
+const createOrUpdateEmpleado = async () => {
+  if (!eNombre || !ePuesto) return alert("Completa los campos");
+
+  const body = {
+    NOMBRES: eNombre,
+    APELLIDOS: eApellidos,
+    CARGO: ePuesto,
+    ESPECIALIDAD: eEspecialidad,
+    TELEFONO: eTelefono,
+    EMAIL: eEmail,
+    ID_SUCURSAL: 1
   };
+
+  try {
+    if (eId) {
+      await api.put(`/api/empleados/${eId}`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Empleado actualizado');
+    } else {
+      await api.post(`/api/empleados`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Empleado creado');
+    }
+    limpiarEmpleado();
+    fetchEmpleados();
+  } catch {
+    alert('Error al guardar empleado');
+  }
+};
+
+
+
 
   // --- CRUD HABITACIONES ---
   const limpiarHabitacion=()=>{setHId(null); setHNumero(''); setHTipo(''); setHEstado('');};
@@ -389,34 +435,124 @@ const formatDateForInput = (fecha: string) => {
 )}
 
 
-        {/* EMPLEADOS */}
-        {view==='empleados' && (
-          <div className="bg-white p-6 rounded shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-4">Empleados</h3>
-            <div className="flex gap-2 mb-4">
-              <input value={eNombre} onChange={e=>setENombre(e.target.value)} placeholder="Nombre" className="p-2 border rounded"/>
-              <input value={ePuesto} onChange={e=>setEPuesto(e.target.value)} placeholder="Puesto" className="p-2 border rounded"/>
-              <button onClick={createOrUpdateEmpleado} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{eId?'Actualizar':'Crear'}</button>
-              <button onClick={limpiarEmpleado} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
-            </div>
-            <table className="w-full border text-left">
-              <thead><tr className="bg-gray-200"><th>ID</th><th>Nombre</th><th>Puesto</th><th>Acciones</th></tr></thead>
-              <tbody>
-                {empleados.map(e=>(
-                  <tr key={e.id}>
-                    <td className="p-2 border">{e.id}</td>
-                    <td className="p-2 border">{e.nombre}</td>
-                    <td className="p-2 border">{e.puesto}</td>
-                    <td className="p-2 border space-x-2">
-                      <button onClick={()=>{setEId(e.id); setENombre(e.nombre); setEPuesto(e.puesto);}} className="text-blue-500 hover:underline">Editar</button>
-                      <button onClick={()=>deleteItem('/api/empleados',e.id,setEmpleados)} className="text-red-500 hover:underline">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+       {/* EMPLEADOS */}
+{view === 'empleados' && (
+  <div className="bg-white p-6 rounded shadow-md mb-6">
+    <h3 className="text-lg font-semibold mb-4">Empleados</h3>
+    
+    {/* Formulario */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
+      <input
+        value={eNombre}
+        onChange={e => setENombre(e.target.value)}
+        placeholder="Nombre"
+        className="p-2 border rounded"
+      />
+      <input
+        value={eApellidos}
+        onChange={e => setEApellidos(e.target.value)}
+        placeholder="Apellidos"
+        className="p-2 border rounded"
+      />
+      <select
+        value={ePuesto}
+        onChange={e => setEPuesto(e.target.value)}
+        className="p-2 border rounded"
+      >
+        <option value="">Seleccione un puesto</option>
+        <option value="Medico">Medico</option>
+        <option value="Recepcionista">Recepcionista</option>
+        <option value="Doctor">Doctor</option>
+        <option value="Enfermero">Enfermero</option>
+        <option value="Administrador">Administrador</option>
+      </select>
+      <input
+        value={eEspecialidad}
+        onChange={e => setEEspecialidad(e.target.value)}
+        placeholder="Especialidad"
+        className="p-2 border rounded"
+      />
+      <input
+        value={eTelefono}
+        onChange={e => setETelefono(e.target.value)}
+        placeholder="Teléfono"
+        className="p-2 border rounded"
+      />
+      <input
+        value={eEmail}
+        onChange={e => setEEmail(e.target.value)}
+        placeholder="Correo"
+        className="p-2 border rounded"
+      />
+    </div>
+
+    <div className="space-x-2 mb-4">
+      <button
+        onClick={createOrUpdateEmpleado}
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        {eId ? 'Actualizar' : 'Crear'}
+      </button>
+      <button
+        onClick={limpiarEmpleado}
+        className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+      >
+        Limpiar
+      </button>
+    </div>
+
+    {/* Tabla */}
+    <table className="w-full border text-left">
+      <thead>
+        <tr className="bg-gray-200">
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Apellidos</th>
+          <th>Puesto</th>
+          <th>Especialidad</th>
+          <th>Teléfono</th>
+          <th>Email</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {empleados.map(e => (
+          <tr key={e.id}>
+            <td className="p-2 border">{e.id}</td>
+            <td className="p-2 border">{e.nombre}</td>
+            <td className="p-2 border">{e.apellidos}</td>
+            <td className="p-2 border">{e.puesto}</td>
+            <td className="p-2 border">{e.especialidad}</td>
+            <td className="p-2 border">{e.telefono}</td>
+            <td className="p-2 border">{e.email}</td>
+            <td className="p-2 border space-x-2">
+              <button
+                onClick={() => {
+                  setEId(e.id);
+                  setENombre(e.nombre);
+                  setEApellidos(e.apellidos);
+                  setEPuesto(e.puesto);
+                  setEEspecialidad(e.especialidad || '');
+                  setETelefono(e.telefono || '');
+                  setEEmail(e.email || '');
+                }}
+                className="text-blue-500 hover:underline"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => deleteItem('/api/empleados', e.id, setEmpleados)}
+                className="text-red-500 hover:underline"
+              >
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
         {/* HABITACIONES */}
         {view==='habitaciones' && (
