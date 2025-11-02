@@ -32,7 +32,7 @@ interface Cita {
   hora: string;
   motivo: string;
 }
-type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas'|'calendar';
+type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas';
 
 const AdminPanel: React.FC = () => {
   const { token, logout } = useAuth();
@@ -392,7 +392,7 @@ useEffect(() => {
         <div>
           <h1 className="text-2xl font-bold text-blue-600 mb-6">MENÚ</h1>
           <nav className="space-y-3">
-            {['usuarios','pacientes','inventario','empleados','habitaciones','historial','citas','calendar'].map(v=>(
+            {['usuarios','pacientes','inventario','empleados','habitaciones','historial','citas'].map(v=>(
               <button key={v} className={`text-left w-full p-2 rounded hover:bg-blue-100 ${view===v?'bg-blue-50':''}`} onClick={()=>setView(v as View)}>
                 {v.charAt(0).toUpperCase()+v.slice(1)}
               </button>
@@ -819,10 +819,6 @@ useEffect(() => {
     </table>
   </div>
 )}
-
-        {/* Calendar placeholder */}
-        {view==='calendar' && <div className="bg-white p-6 rounded shadow-md">Calendario (pendiente de implementación)</div>}
-
       </main>
     </div>
   );
