@@ -24,8 +24,14 @@ interface Historial {
   fechaRegistro: string | null;
 }
 
-interface Cita { id: number; paciente: string; fecha: string; hora: string; motivo: string; }
-
+// Tipos
+interface Cita {
+  id: number;
+  paciente: string;
+  fecha: string;
+  hora: string;
+  motivo: string;
+}
 type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas'|'calendar';
 
 const AdminPanel: React.FC = () => {
@@ -68,14 +74,15 @@ const [eEmail, setEEmail] = useState('');
   const [hEstado, setHEstado] = useState('');
 
   const [historial, setHistorial] = useState<Historial[]>([]);
-  const [hisId, setHisId] = useState<number | null>(null);
-  const [hisPacienteId, setHisPacienteId] = useState('');
-  const [hisFecha, setHisFecha] = useState('');
-  const [hisDiagnostico, setHisDiagnostico] = useState('');
-  const [hisTratamiento, setHisTratamiento] = useState('');
-  const [hisNotas, setHisNotas] = useState('');
 
-  const [citas, setCitas] = useState<Cita[]>([]);
+
+ // --- State ---
+const [citas, setCitas] = useState<Cita[]>([]);
+const [cId, setCId] = useState<number | null>(null);
+const [cPaciente, setCPaciente] = useState('');
+const [cFecha, setCFecha] = useState('');
+const [cHora, setCHora] = useState('');
+const [cMotivo, setCMotivo] = useState('');
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -115,20 +122,60 @@ const formatDateForInput = (fecha: string) => {
   const day = d.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+// --- Limpiar formulario ---
+const limpiarCita = () => {
+  setCId(null);
+  setCPaciente('');
+  setCFecha('');
+  setCHora('');
+  setCMotivo('');
+};
 
-  const fetchCitas = async () => {
-    try {
-      const r = await api.get<{ ID_CITA: number; PACIENTE: string; FECHA: string; HORA: string; MOTIVO: string }[]>('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
-      const data: Cita[] = r.data.map(c => ({
-        id: c.ID_CITA,
-        paciente: c.PACIENTE,
-        fecha: c.FECHA,
-        hora: c.HORA,
-        motivo: c.MOTIVO
-      }));
-      setCitas(data);
-    } catch { setError('Error cargando citas'); }
-  };
+// --- Crear o actualizar ---
+const createOrUpdateCita = async () => {
+  if (!cPaciente || !cFecha) return alert("Completa los campos requeridos");
+
+  try {
+    const body = { paciente: cPaciente, fecha: cFecha, hora: cHora || null, motivo: cMotivo || null };
+    if (cId) {
+      await api.put(`/api/citas/${cId}`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Cita actualizada');
+    } else {
+      await api.post(`/api/citas`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Cita creada');
+    }
+    limpiarCita();
+    fetchCitas();
+  } catch (err) {
+    console.error(err);
+    alert('Error al guardar cita');
+  }
+};
+
+// --- Eliminar ---
+const eliminarCitaWeb = async (id: number) => {
+  if (!confirm('¿Seguro que quieres eliminar esta cita?')) return;
+  try {
+    await api.delete(`/api/citas/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+    setCitas(prev => prev.filter(c => c.id !== id));
+  } catch (err) {
+    console.error(err);
+    alert('Error al eliminar cita');
+  }
+};
+
+// --- Cargar citas desde API ---
+const fetchCitas = async () => {
+  try {
+    const r = await api.get<Cita[]>('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
+    setCitas(r.data);
+  } catch {
+    alert('Error cargando citas');
+  }
+};
+
+// Llamar fetch al montar el componente
+useEffect(() => { fetchCitas(); }, []);
 
  const fetchHistorial = async () => {
   try {
@@ -325,6 +372,8 @@ const createOrUpdateHabitacion = async () => {
   }
 };
 
+
+
 // Fetch de habitaciones con refresco automático
 useEffect(() => {
   fetchHabitaciones(); // carga inicial
@@ -334,7 +383,7 @@ useEffect(() => {
 
 
 
-
+ 
   // --- RENDER ---
   return (
     <div className="flex h-screen bg-gray-100">
@@ -720,26 +769,56 @@ useEffect(() => {
   </div>
 )}
 
-        {/* Citas */}
-        {view==='citas' && (
-          <div className="bg-white p-6 rounded shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-4">Citas</h3>
-            <table className="w-full border text-left">
-              <thead><tr className="bg-gray-200"><th>ID</th><th>Paciente</th><th>Fecha</th><th>Hora</th><th>Motivo</th></tr></thead>
-              <tbody>
-                {citas.map(c=>(
-                  <tr key={c.id}>
-                    <td className="p-2 border">{c.id}</td>
-                    <td className="p-2 border">{c.paciente}</td>
-                    <td className="p-2 border">{c.fecha}</td>
-                    <td className="p-2 border">{c.hora}</td>
-                    <td className="p-2 border">{c.motivo}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+{/* CITAS */}
+{view==='citas' && (
+  <div className="bg-white p-6 rounded shadow-md mb-6">
+    <h3 className="text-lg font-semibold mb-4">Citas</h3>
+
+    {/* Formulario */}
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
+      <input value={cPaciente} onChange={e=>setCPaciente(e.target.value)} placeholder="Paciente" className="p-2 border rounded"/>
+      <input type="date" value={cFecha} onChange={e=>setCFecha(e.target.value)} className="p-2 border rounded"/>
+      <input type="time" value={cHora} onChange={e=>setCHora(e.target.value)} className="p-2 border rounded"/>
+      <input value={cMotivo} onChange={e=>setCMotivo(e.target.value)} placeholder="Motivo" className="p-2 border rounded"/>
+      <div className="flex gap-2">
+        <button onClick={createOrUpdateCita} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+          {cId ? 'Actualizar' : 'Crear'}
+        </button>
+        <button onClick={limpiarCita} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
+      </div>
+    </div>
+
+    {/* Tabla */}
+    <table className="w-full border text-left">
+      <thead>
+        <tr className="bg-gray-200">
+          <th>ID</th>
+          <th>Paciente</th>
+          <th>Fecha</th>
+          <th>Hora</th>
+          <th>Motivo</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {citas.map(c => (
+          <tr key={c.id}>
+            <td className="p-2 border">{c.id}</td>
+            <td className="p-2 border">{c.paciente}</td>
+            <td className="p-2 border">{c.fecha}</td>
+            <td className="p-2 border">{c.hora}</td>
+            <td className="p-2 border">{c.motivo}</td>
+            <td className="p-2 border space-x-2">
+              <button onClick={()=>{ setCId(c.id); setCPaciente(c.paciente); setCFecha(c.fecha); setCHora(c.hora); setCMotivo(c.motivo); }}
+                className="text-blue-500 hover:underline">Editar</button>
+              <button onClick={()=>eliminarCitaWeb(c.id)} className="text-red-500 hover:underline">Eliminar</button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
         {/* Calendar placeholder */}
         {view==='calendar' && <div className="bg-white p-6 rounded shadow-md">Calendario (pendiente de implementación)</div>}
