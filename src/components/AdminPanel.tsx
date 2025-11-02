@@ -332,6 +332,9 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
+
+
+
   // --- RENDER ---
   return (
     <div className="flex h-screen bg-gray-100">
