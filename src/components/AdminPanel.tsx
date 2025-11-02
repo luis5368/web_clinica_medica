@@ -23,15 +23,32 @@ interface Historial {
   observaciones: string | null;
   fechaRegistro: string | null;
 }
+interface CitaBackend {
+  ID: number;
+  FECHA: string;
+  HORA: string | null;
+  MOTIVO: string | null;
+  ID_PACIENTE: number;
+  ID_EMPLEADO: number | null;
+  PACIENTE: string | null;
+  EMPLEADO: string | null;
+}
+
 
 // Tipos
+// --- Tipos ---
+
 interface Cita {
-  id: number;
-  paciente: string;
-  fecha: string;
-  hora: string;
-  motivo: string;
+  id: number;             // <- ID en minúscula
+  fecha: string;          // <- FECHA
+  hora: string | null;    // <- HORA
+  motivo: string | null;  // <- MOTIVO
+  paciente: string;       // <- PACIENTE
+  empleado: string | null;// <- EMPLEADO
+  id_paciente: number;    // <- ID_PACIENTE
+  id_empleado: number | null; // <- ID_EMPLEADO
 }
+
 type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas';
 
 const AdminPanel: React.FC = () => {
@@ -74,28 +91,35 @@ const [eEmail, setEEmail] = useState('');
   const [hEstado, setHEstado] = useState('');
 
   const [historial, setHistorial] = useState<Historial[]>([]);
-
-
- // --- State ---
+// --- State de Citas ---
 const [citas, setCitas] = useState<Cita[]>([]);
 const [cId, setCId] = useState<number | null>(null);
-const [cPaciente, setCPaciente] = useState('');
 const [cFecha, setCFecha] = useState('');
 const [cHora, setCHora] = useState('');
 const [cMotivo, setCMotivo] = useState('');
 
+// IDs de relación
+const [cPacienteId, setCPacienteId] = useState<number | null>(null);
+const [cEmpleadoId, setCEmpleadoId] = useState<number | null>(null);
+
+
+
+
+
+
   // --- FETCH DATA ---
-  useEffect(() => {
-    if(token){
-      fetchUsers();
-      fetchPacientes();
-      fetchInventario();
-      fetchEmpleados();
-      fetchHabitaciones();
-      fetchHistorial();
-      fetchCitas();
-    }
-  }, [token]);
+ useEffect(() => {
+  if(token){
+    fetchUsers();
+    fetchPacientes();
+    fetchInventario();
+    fetchEmpleados();
+    fetchHabitaciones();
+    fetchHistorial();
+    fetchCitas();
+  }
+}, [token]);
+
 
   const fetchUsers = async()=>{ 
     try{ const r = await api.get('/api/users',{headers:{Authorization:`Bearer ${token}`}}); setUsers(r.data);}
@@ -125,25 +149,66 @@ const formatDateForInput = (fecha: string) => {
 // --- Limpiar formulario ---
 const limpiarCita = () => {
   setCId(null);
-  setCPaciente('');
   setCFecha('');
   setCHora('');
   setCMotivo('');
+  setCPacienteId(null);
+  setCEmpleadoId(null);
 };
+
+const fetchCitas = async () => {
+  try {
+    const r = await api.get<CitaBackend[]>('/api/citas', { 
+      headers: { Authorization: `Bearer ${token}` } 
+    });
+    const citasRaw = r.data;
+
+    const data: Cita[] = citasRaw.map(c => ({
+      id: c.ID,
+      fecha: c.FECHA,
+      hora: c.HORA,
+      motivo: c.MOTIVO,
+      id_paciente: c.ID_PACIENTE,
+      id_empleado: c.ID_EMPLEADO,
+      paciente: c.PACIENTE || 'No asignado',
+      empleado: c.EMPLEADO || 'No asignado',
+    }));
+
+    setCitas(data);
+  } catch (err) {
+    console.error(err);
+    alert('Error cargando citas');
+  }
+};
+
+
+
+
+
+
+
 
 // --- Crear o actualizar ---
 const createOrUpdateCita = async () => {
-  if (!cPaciente || !cFecha) return alert("Completa los campos requeridos");
+  if (!cPacienteId || !cFecha) return alert('Selecciona un paciente y una fecha');
+
+  const body = {
+    id_paciente: cPacienteId,
+    id_empleado: cEmpleadoId,
+    fecha: cFecha,
+    hora: cHora || null,
+    motivo: cMotivo || null,
+  };
 
   try {
-    const body = { paciente: cPaciente, fecha: cFecha, hora: cHora || null, motivo: cMotivo || null };
     if (cId) {
       await api.put(`/api/citas/${cId}`, body, { headers: { Authorization: `Bearer ${token}` } });
       alert('Cita actualizada');
     } else {
-      await api.post(`/api/citas`, body, { headers: { Authorization: `Bearer ${token}` } });
+      await api.post('/api/citas', body, { headers: { Authorization: `Bearer ${token}` } });
       alert('Cita creada');
     }
+
     limpiarCita();
     fetchCitas();
   } catch (err) {
@@ -158,19 +223,8 @@ const eliminarCitaWeb = async (id: number) => {
   try {
     await api.delete(`/api/citas/${id}`, { headers: { Authorization: `Bearer ${token}` } });
     setCitas(prev => prev.filter(c => c.id !== id));
-  } catch (err) {
-    console.error(err);
-    alert('Error al eliminar cita');
-  }
-};
-
-// --- Cargar citas desde API ---
-const fetchCitas = async () => {
-  try {
-    const r = await api.get<Cita[]>('/api/citas', { headers: { Authorization: `Bearer ${token}` } });
-    setCitas(r.data);
   } catch {
-    alert('Error cargando citas');
+    alert('Error al eliminar cita');
   }
 };
 
@@ -768,32 +822,90 @@ useEffect(() => {
     </table>
   </div>
 )}
-
 {/* CITAS */}
-{view==='citas' && (
+{view === 'citas' && (
   <div className="bg-white p-6 rounded shadow-md mb-6">
     <h3 className="text-lg font-semibold mb-4">Citas</h3>
 
     {/* Formulario */}
     <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
-      <input value={cPaciente} onChange={e=>setCPaciente(e.target.value)} placeholder="Paciente" className="p-2 border rounded"/>
-      <input type="date" value={cFecha} onChange={e=>setCFecha(e.target.value)} className="p-2 border rounded"/>
-      <input type="time" value={cHora} onChange={e=>setCHora(e.target.value)} className="p-2 border rounded"/>
-      <input value={cMotivo} onChange={e=>setCMotivo(e.target.value)} placeholder="Motivo" className="p-2 border rounded"/>
-      <div className="flex gap-2">
-        <button onClick={createOrUpdateCita} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-          {cId ? 'Actualizar' : 'Crear'}
-        </button>
-        <button onClick={limpiarCita} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
-      </div>
+      
+      {/* Selección de Paciente */}
+      <select
+        value={cPacienteId ?? ''}
+        onChange={e => setCPacienteId(Number(e.target.value))}
+        className="p-2 border rounded"
+      >
+        <option value="">Seleccione paciente</option>
+        {pacientes.map(p => (
+          <option key={p.id} value={p.id}>
+            {p.nombres} {p.apellidos}
+          </option>
+        ))}
+      </select>
+
+      {/* Selección de Empleado */}
+      <select
+        value={cEmpleadoId ?? ''}
+        onChange={e => setCEmpleadoId(Number(e.target.value))}
+        className="p-2 border rounded"
+      >
+        <option value="">Seleccione empleado</option>
+        {empleados.map(e => (
+          <option key={e.id} value={e.id}>
+            {e.nombre} {e.apellidos} - {e.puesto}
+          </option>
+        ))}
+      </select>
+
+      {/* Fecha */}
+      <input
+        type="date"
+        value={cFecha}
+        onChange={e => setCFecha(e.target.value)}
+        className="p-2 border rounded"
+      />
+
+      {/* Hora */}
+      <input
+        type="time"
+        value={cHora}
+        onChange={e => setCHora(e.target.value)}
+        className="p-2 border rounded"
+      />
+
+      {/* Motivo */}
+      <input
+        value={cMotivo}
+        onChange={e => setCMotivo(e.target.value)}
+        placeholder="Motivo"
+        className="p-2 border rounded"
+      />
     </div>
 
-    {/* Tabla */}
+    {/* Botones */}
+    <div className="flex gap-2 mb-4">
+      <button
+        onClick={createOrUpdateCita}
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        {cId ? 'Actualizar' : 'Crear'}
+      </button>
+      <button
+        onClick={limpiarCita}
+        className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+      >
+        Limpiar
+      </button>
+    </div>
+
+    {/* Tabla de citas */}
     <table className="w-full border text-left">
       <thead>
         <tr className="bg-gray-200">
           <th>ID</th>
           <th>Paciente</th>
+          <th>Empleado</th>
           <th>Fecha</th>
           <th>Hora</th>
           <th>Motivo</th>
@@ -805,13 +917,30 @@ useEffect(() => {
           <tr key={c.id}>
             <td className="p-2 border">{c.id}</td>
             <td className="p-2 border">{c.paciente}</td>
-            <td className="p-2 border">{c.fecha}</td>
+            <td className="p-2 border">{c.empleado}</td>
+            <td className="p-2 border">{c.fecha.split('T')[0]}</td> {/* solo YYYY-MM-DD */}
             <td className="p-2 border">{c.hora}</td>
             <td className="p-2 border">{c.motivo}</td>
             <td className="p-2 border space-x-2">
-              <button onClick={()=>{ setCId(c.id); setCPaciente(c.paciente); setCFecha(c.fecha); setCHora(c.hora); setCMotivo(c.motivo); }}
-                className="text-blue-500 hover:underline">Editar</button>
-              <button onClick={()=>eliminarCitaWeb(c.id)} className="text-red-500 hover:underline">Eliminar</button>
+              <button
+                onClick={() => {
+                  setCId(c.id);
+                  setCFecha(c.fecha.split('T')[0]); // extrae solo la fecha
+                  setCHora(c.hora || '');
+                  setCMotivo(c.motivo || '');
+                  setCPacienteId(Number(c.id_paciente)); // asegurar tipo number
+                  setCEmpleadoId(c.id_empleado ? Number(c.id_empleado) : null);
+                }}
+                className="text-blue-500 hover:underline"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => eliminarCitaWeb(c.id)}
+                className="text-red-500 hover:underline"
+              >
+                Eliminar
+              </button>
             </td>
           </tr>
         ))}
@@ -819,6 +948,8 @@ useEffect(() => {
     </table>
   </div>
 )}
+
+
       </main>
     </div>
   );
