@@ -50,6 +50,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('role');
   };
 
+  // Interceptor global para detectar sesión inválida
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          alert(error.response.data.error || 'Tu sesión ha sido cerrada desde otro dispositivo.');
+          logout();
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => api.interceptors.response.eject(interceptor);
+  }, []);
+
   return (
     <AuthContext.Provider value={{ token, role, login, logout }}>
       {children}
