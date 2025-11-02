@@ -16,7 +16,14 @@ interface Empleado {
 }
 
 interface Habitacion { id: number; numero: string; tipo: string; estado: string; }
-interface Historial { id: number; pacienteId: number; fecha: string; diagnostico: string; tratamiento: string; notas: string; }
+interface Historial {
+  id: number;
+  pacienteId: number;
+  idAtencion: number | null;
+  observaciones: string | null;
+  fechaRegistro: string | null;
+}
+
 interface Cita { id: number; paciente: string; fecha: string; hora: string; motivo: string; }
 
 type View = 'usuarios'|'pacientes'|'inventario'|'empleados'|'habitaciones'|'historial'|'citas'|'calendar';
@@ -57,7 +64,7 @@ const [eEmail, setEEmail] = useState('');
   const [habitaciones, setHabitaciones] = useState<Habitacion[]>([]);
   const [hId, setHId] = useState<number | null>(null);
   const [hNumero, setHNumero] = useState('');
-  const [hTipo, setHTipo] = useState('');
+  //const [hTipo, setHTipo] = useState('');
   const [hEstado, setHEstado] = useState('');
 
   const [historial, setHistorial] = useState<Historial[]>([]);
@@ -123,20 +130,22 @@ const formatDateForInput = (fecha: string) => {
     } catch { setError('Error cargando citas'); }
   };
 
-  const fetchHistorial = async () => {
-    try {
-      const r = await api.get<{ ID_HISTORIAL: number; ID_PACIENTE: number; FECHA: string; DIAGNOSTICO: string; TRATAMIENTO: string; NOTAS: string }[]>('/api/historial', { headers: { Authorization: `Bearer ${token}` } });
-      const data: Historial[] = r.data.map(h => ({
-        id: h.ID_HISTORIAL,
-        pacienteId: h.ID_PACIENTE,
-        fecha: h.FECHA,
-        diagnostico: h.DIAGNOSTICO,
-        tratamiento: h.TRATAMIENTO,
-        notas: h.NOTAS
-      }));
-      setHistorial(data);
-    } catch { setError('Error cargando historial clínico'); }
-  };
+ const fetchHistorial = async () => {
+  try {
+    const r = await api.get<{ ID_HISTORIAL: number; ID_PACIENTE: number; ID_ATENCION: number | null; OBSERVACIONES: string | null; FECHA_REGISTRO: string | null }[]>('/api/historial', { headers: { Authorization: `Bearer ${token}` } });
+    const data = r.data.map(h => ({
+      id: h.ID_HISTORIAL,
+      pacienteId: h.ID_PACIENTE,
+      idAtencion: h.ID_ATENCION,
+      observaciones: h.OBSERVACIONES,
+      fechaRegistro: h.FECHA_REGISTRO,
+    }));
+    setHistorial(data);
+  } catch {
+    setError('Error cargando historial clínico');
+  }
+};
+
 
   const fetchPacientes = async () => {
     try {
@@ -322,20 +331,6 @@ useEffect(() => {
   const interval = setInterval(fetchHabitaciones, 5000); // refresco cada 5s
   return () => clearInterval(interval);
 }, []);
-
-
-
-  // --- CRUD HISTORIAL ---
-  const limpiarHistorial=()=>{setHisId(null); setHisPacienteId(''); setHisFecha(''); setHisDiagnostico(''); setHisTratamiento(''); setHisNotas('');};
-  const createOrUpdateHistorial=async()=>{
-    if(!hisPacienteId||!hisDiagnostico) return alert("Completa los campos requeridos");
-    try{
-      const body = {ID_PACIENTE:hisPacienteId,FECHA:hisFecha,DIAGNOSTICO:hisDiagnostico,TRATAMIENTO:hisTratamiento,NOTAS:hisNotas};
-      if(hisId){ await api.put(`/api/historial/${hisId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Historial actualizado'); }
-      else { await api.post(`/api/historial`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Historial creado'); }
-      limpiarHistorial(); fetchHistorial();
-    } catch { alert('Error al guardar historial'); }
-  };
 
   // --- RENDER ---
   return (
@@ -683,47 +678,44 @@ useEffect(() => {
 )}
 
 
-        {/* HISTORIAL */}
-        {view==='historial' && (
-          <div className="bg-white p-6 rounded shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-4">Historial Clínico</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-              <select value={hisPacienteId} onChange={e=>setHisPacienteId(e.target.value)} className="p-2 border rounded">
-                <option value="">Selecciona paciente</option>
-                {pacientes.map(p=><option key={p.id} value={p.id}>{p.nombres} {p.apellidos}</option>)}
-              </select>
-              <input type="date" value={hisFecha} onChange={e=>setHisFecha(e.target.value)} className="p-2 border rounded"/>
-              <input value={hisDiagnostico} onChange={e=>setHisDiagnostico(e.target.value)} placeholder="Diagnóstico" className="p-2 border rounded"/>
-              <input value={hisTratamiento} onChange={e=>setHisTratamiento(e.target.value)} placeholder="Tratamiento" className="p-2 border rounded"/>
-              <input value={hisNotas} onChange={e=>setHisNotas(e.target.value)} placeholder="Notas" className="p-2 border rounded"/>
-            </div>
-            <div className="space-x-2 mb-4">
-              <button onClick={createOrUpdateHistorial} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{hisId?'Actualizar':'Crear'}</button>
-              <button onClick={limpiarHistorial} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
-            </div>
-            <table className="w-full border text-left">
-              <thead><tr className="bg-gray-200"><th>ID</th><th>Paciente</th><th>Fecha</th><th>Diagnóstico</th><th>Tratamiento</th><th>Notas</th><th>Acciones</th></tr></thead>
-              <tbody>
-                {historial.map(h=>(
-                  <tr key={h.id}>
-                    <td className="p-2 border">{h.id}</td>
-                    <td className="p-2 border">{pacientes.find(p=>p.id===h.pacienteId)?.nombres ?? ''} {pacientes.find(p=>p.id===h.pacienteId)?.apellidos ?? ''}</td>
-                    <td className="p-2 border">{h.fecha}</td>
-                    <td className="p-2 border">{h.diagnostico}</td>
-                    <td className="p-2 border">{h.tratamiento}</td>
-                    <td className="p-2 border">{h.notas}</td>
-                    <td className="p-2 border space-x-2">
-                      <button onClick={()=>{
-                        setHisId(h.id); setHisPacienteId(String(h.pacienteId)); setHisFecha(h.fecha); setHisDiagnostico(h.diagnostico); setHisTratamiento(h.tratamiento); setHisNotas(h.notas);
-                      }} className="text-blue-500 hover:underline">Editar</button>
-                      <button onClick={()=>deleteItem('/api/historial',h.id,setHistorial)} className="text-red-500 hover:underline">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+{/* HISTORIAL */}
+{view === 'historial' && (
+  <div className="bg-white p-6 rounded shadow-md mb-6">
+    <h3 className="text-lg font-semibold mb-4">Historial Clínico</h3>
+
+    <table className="w-full border text-left">
+      <thead>
+        <tr className="bg-gray-200">
+          <th>ID</th>
+          <th>Paciente</th>
+          <th>Fecha Registro</th>
+          <th>Observaciones</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {historial.map(h => (
+          <tr key={h.id}>
+            <td className="p-2 border">{h.id}</td>
+            <td className="p-2 border">
+              {pacientes.find(p => p.id === h.pacienteId)?.nombres ?? ''} {pacientes.find(p => p.id === h.pacienteId)?.apellidos ?? ''}
+            </td>
+            <td className="p-2 border">{h.fechaRegistro ?? ''}</td>
+            <td className="p-2 border">{h.observaciones ?? ''}</td>
+            <td className="p-2 border">
+              <button
+                onClick={() => deleteItem('/api/historial', h.id, setHistorial)}
+                className="text-red-500 hover:underline"
+              >
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
 
         {/* Citas */}
         {view==='citas' && (
