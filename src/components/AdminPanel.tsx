@@ -189,7 +189,7 @@ const formatDateForInput = (fecha: string) => {
   }
 };
 
-
+  /*fetch habitaciones */
   const fetchHabitaciones = async () => {
     try {
       const r = await api.get<{ ID_HABITACION: number; NUMERO: string; TIPO: string; ESTADO: string }[]>('/api/habitaciones', { headers: { Authorization: `Bearer ${token}` } });
@@ -278,17 +278,52 @@ const createOrUpdateEmpleado = async () => {
 
 
 
-  // --- CRUD HABITACIONES ---
-  const limpiarHabitacion=()=>{setHId(null); setHNumero(''); setHTipo(''); setHEstado('');};
-  const createOrUpdateHabitacion=async()=>{
-    if(!hNumero||!hTipo||!hEstado) return alert("Completa todos los campos");
-    try{
-      const body = {NUMERO:hNumero,TIPO:hTipo,ESTADO:hEstado};
-      if(hId){ await api.put(`/api/habitaciones/${hId}`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Habitación actualizada'); }
-      else { await api.post(`/api/habitaciones`, body,{headers:{Authorization:`Bearer ${token}`}}); alert('Habitación creada'); }
-      limpiarHabitacion(); fetchHabitaciones();
-    } catch { alert('Error al guardar habitación'); }
-  };
+ // Habitaciones predefinidas (quemadas)
+const habitacionesDisponibles = [
+  { id: 1, numero: '101' },
+  { id: 2, numero: '102' },
+  { id: 3, numero: '103' },
+];
+
+// Limpiar formulario
+const limpiarHabitacion = () => {
+  setHId(null);
+  setHNumero('');
+  setHEstado('');
+};
+
+// Crear o actualizar habitación
+const createOrUpdateHabitacion = async () => {
+  if (!hId || !hEstado) return alert("Selecciona habitación y estado");
+
+  const estadoNormalizado = hEstado.charAt(0).toUpperCase() + hEstado.slice(1).toLowerCase();
+  const body = { NUMERO: hNumero, ESTADO: estadoNormalizado, ID_SUCURSAL: 1 };
+
+  try {
+    const existe = habitaciones.find(h => h.id === hId);
+    if (existe) {
+      await api.put(`/api/habitaciones/${hId}`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Habitación actualizada');
+    } else {
+      await api.post(`/api/habitaciones`, body, { headers: { Authorization: `Bearer ${token}` } });
+      alert('Habitación creada');
+    }
+
+    limpiarHabitacion();
+    fetchHabitaciones(); // refresca la tabla para todos los usuarios
+  } catch {
+    alert('Error al guardar habitación');
+  }
+};
+
+// Fetch de habitaciones con refresco automático
+useEffect(() => {
+  fetchHabitaciones(); // carga inicial
+  const interval = setInterval(fetchHabitaciones, 5000); // refresco cada 5s
+  return () => clearInterval(interval);
+}, []);
+
+
 
   // --- CRUD HISTORIAL ---
   const limpiarHistorial=()=>{setHisId(null); setHisPacienteId(''); setHisFecha(''); setHisDiagnostico(''); setHisTratamiento(''); setHisNotas('');};
@@ -554,36 +589,99 @@ const createOrUpdateEmpleado = async () => {
   </div>
 )}
 
-        {/* HABITACIONES */}
-        {view==='habitaciones' && (
-          <div className="bg-white p-6 rounded shadow-md mb-6">
-            <h3 className="text-lg font-semibold mb-4">Habitaciones</h3>
-            <div className="flex gap-2 mb-4">
-              <input value={hNumero} onChange={e=>setHNumero(e.target.value)} placeholder="Número" className="p-2 border rounded"/>
-              <input value={hTipo} onChange={e=>setHTipo(e.target.value)} placeholder="Tipo" className="p-2 border rounded"/>
-              <input value={hEstado} onChange={e=>setHEstado(e.target.value)} placeholder="Estado" className="p-2 border rounded"/>
-              <button onClick={createOrUpdateHabitacion} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">{hId?'Actualizar':'Crear'}</button>
-              <button onClick={limpiarHabitacion} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Limpiar</button>
-            </div>
-            <table className="w-full border text-left">
-              <thead><tr className="bg-gray-200"><th>ID</th><th>Número</th><th>Tipo</th><th>Estado</th><th>Acciones</th></tr></thead>
-              <tbody>
-                {habitaciones.map(h=>(
-                  <tr key={h.id}>
-                    <td className="p-2 border">{h.id}</td>
-                    <td className="p-2 border">{h.numero}</td>
-                    <td className="p-2 border">{h.tipo}</td>
-                    <td className="p-2 border">{h.estado}</td>
-                    <td className="p-2 border space-x-2">
-                      <button onClick={()=>{setHId(h.id); setHNumero(h.numero); setHTipo(h.tipo); setHEstado(h.estado);}} className="text-blue-500 hover:underline">Editar</button>
-                      <button onClick={()=>deleteItem('/api/habitaciones',h.id,setHabitaciones)} className="text-red-500 hover:underline">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+{/* HABITACIONES */}
+{view === 'habitaciones' && (
+  <div className="bg-white p-6 rounded shadow-md mb-6">
+    <h3 className="text-lg font-semibold mb-4">Habitaciones</h3>
+
+    <div className="flex gap-2 mb-4">
+      {/* Dropdown de habitaciones predefinidas */}
+      <select
+        value={hId || ''}
+        onChange={e => {
+          const selected = habitacionesDisponibles.find(h => h.id === Number(e.target.value));
+          if (selected) {
+            setHId(selected.id);
+            setHNumero(selected.numero);
+            const habitacionEstado = habitaciones.find(h => h.id === selected.id)?.estado || 'Libre';
+            setHEstado(habitacionEstado);
+          }
+        }}
+        className="p-2 border rounded"
+      >
+        <option value="">Selecciona una habitación</option>
+        {habitacionesDisponibles.map(h => (
+          <option key={h.id} value={h.id}>
+            {h.numero}
+          </option>
+        ))}
+      </select>
+
+      {/* Dropdown de estado */}
+      <select
+        value={hEstado || ''}
+        onChange={e => setHEstado(e.target.value)}
+        className="p-2 border rounded"
+      >
+        <option value="">Selecciona Estado</option>
+        <option value="Libre">Libre</option>
+        <option value="Ocupada">Ocupada</option>
+      </select>
+
+      <button
+        onClick={createOrUpdateHabitacion}
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        {hId ? 'Actualizar' : 'Crear'}
+      </button>
+
+      <button
+        onClick={limpiarHabitacion}
+        className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+      >
+        Limpiar
+      </button>
+    </div>
+
+    {/* Tabla de habitaciones */}
+    <table className="w-full border text-left">
+      <thead>
+        <tr className="bg-gray-200">
+          <th>ID</th>
+          <th>Número</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {habitaciones.map(h => (
+          <tr key={h.id}>
+            <td className="p-2 border">{h.id}</td>
+            <td className="p-2 border">{h.numero}</td>
+            <td className="p-2 border">
+              {h.estado.charAt(0).toUpperCase() + h.estado.slice(1).toLowerCase()}
+            </td>
+            <td className="p-2 border space-x-2">
+              <button
+                onClick={() => { setHId(h.id); setHNumero(h.numero); setHEstado(h.estado); }}
+                className="text-blue-500 hover:underline"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => deleteItem('/api/habitaciones', h.id, setHabitaciones)}
+                className="text-red-500 hover:underline"
+              >
+                Eliminar
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
 
         {/* HISTORIAL */}
         {view==='historial' && (
